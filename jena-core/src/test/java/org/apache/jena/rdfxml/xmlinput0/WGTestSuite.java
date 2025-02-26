@@ -44,21 +44,13 @@ import org.apache.jena.vocabulary.RDFS ;
 import org.apache.jena.vocabulary.ReasonerVocabulary ;
 import org.xml.sax.SAXException;
 class WGTestSuite extends TestSuite implements ARPErrorNumbers {
-	static private Resource jena2;
+	static private Resource jena;
 	static private Model testResults;
 	static private void initResults() {
 		logging = true;
 		testResults = ModelFactory.createDefaultModel();
-		jena2 = testResults.createResource(BASE_RESULTS_URI + "#jena2");
-		jena2.addProperty(RDFS.comment,
-			testResults.createLiteral(
-				"<a xmlns=\"http://www.w3.org/1999/xhtml\" href=\"http://jena.sourceforce.net/\">Jena2</a> is a" +
-				" Semantic Web framework in Java" +
-				" available from <a xmlns=\"http://www.w3.org/1999/xhtml\" href=\"http://www.sourceforce.net/projects/jena\">" +
-				"sourceforge</a> CVS.",
-				true)
-		);
-		jena2.addProperty(RDFS.label, "Jena2");
+		jena = testResults.createResource(BASE_RESULTS_URI + "#jena");
+		jena.addProperty(RDFS.label, "Jena");
 		testResults.setNsPrefix("results", OWLResults.NS);
 	}
 	static void logResult(Resource test, int type) {
@@ -88,7 +80,7 @@ class WGTestSuite extends TestSuite implements ARPErrorNumbers {
 //				.addProperty(OWLResults.system, jena2);
 	}
 	private static boolean logging = false;
-	private static String BASE_RESULTS_URI = "http://jena.sourceforge.net/data/rdf-results.rdf";
+	private static String BASE_RESULTS_URI = "https://jena.apache.org/data/rdf-results.rdf";
     static public boolean checkMessages = false;
     static private boolean doSemanticTests() {
     	return ARPTests.internet;

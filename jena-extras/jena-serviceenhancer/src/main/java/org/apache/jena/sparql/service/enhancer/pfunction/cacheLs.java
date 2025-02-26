@@ -31,8 +31,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import org.apache.jena.ext.com.google.common.collect.Range;
-import org.apache.jena.ext.com.google.common.collect.Sets;
+import com.google.common.collect.Range;
+import com.google.common.collect.Sets;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.query.Query;
@@ -81,7 +81,7 @@ public class cacheLs
     private static Optional<BindingBuilder> processArg(Optional<BindingBuilder> builderOpt, List<Node> nodes, int i, Supplier<Node> valueSupplier) {
         Optional<BindingBuilder> result = builderOpt;
         if (builderOpt.isPresent()) {
-            BindingBuilder builder = builderOpt.get();
+            BindingBuilder builder = builderOpt.orElseThrow();
             int n = nodes.size();
             if (i < n) {
                 Node key = nodes.get(i);
@@ -132,7 +132,7 @@ public class cacheLs
 
                 Optional<BindingBuilder> parentBuilder = Optional.of(BindingFactory.builder(inputBinding));
                 if (sv != null) {
-                    parentBuilder.get().add(sv, idNode);
+                    parentBuilder.orElseThrow().add(sv, idNode);
                 }
 
                 ServiceCacheKey key = idToKey.get(id);
@@ -142,10 +142,10 @@ public class cacheLs
                     Op normOp = key.getOp();
                     Op op = Rename.reverseVarRename(normOp, true);
                     Query query = OpAsQuery.asQuery(op);
-                    return NodeFactory.createLiteral(query.toString());
+                    return NodeFactory.createLiteralString(query.toString());
                 });
 
-                parentBuilder = processArg(parentBuilder, objectArgs, 2, () -> NodeFactory.createLiteral(key.getBinding().toString()));
+                parentBuilder = processArg(parentBuilder, objectArgs, 2, () -> NodeFactory.createLiteralString(key.getBinding().toString()));
 
                 Optional<Binding> parentBindingOpt = parentBuilder.map(BindingBuilder::build);
 

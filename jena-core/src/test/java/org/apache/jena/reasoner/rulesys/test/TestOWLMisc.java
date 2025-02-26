@@ -18,27 +18,32 @@
 
 package org.apache.jena.reasoner.rulesys.test;
 
-import java.io.StringReader ;
-import java.util.Iterator ;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
+import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.graph.Triple;
+import org.apache.jena.ontology.DatatypeProperty;
+import org.apache.jena.ontology.OntDocumentManager;
+import org.apache.jena.ontology.OntModel;
+import org.apache.jena.ontology.OntModelSpec;
+import org.apache.jena.rdf.model.InfModel;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.Statement;
+import org.apache.jena.reasoner.Reasoner;
+import org.apache.jena.reasoner.ReasonerRegistry;
+import org.apache.jena.reasoner.ValidityReport;
+import org.apache.jena.reasoner.rulesys.FBRuleInfGraph;
+import org.apache.jena.util.FileManager;
+import org.apache.jena.vocabulary.OWL;
+import org.apache.jena.vocabulary.RDF;
+import org.apache.jena.vocabulary.RDFS;
 
-import junit.framework.TestCase ;
-import junit.framework.TestSuite ;
-import org.apache.jena.datatypes.RDFDatatype ;
-import org.apache.jena.datatypes.xsd.XSDDatatype ;
-import org.apache.jena.graph.Triple ;
-import org.apache.jena.ontology.DatatypeProperty ;
-import org.apache.jena.ontology.OntDocumentManager ;
-import org.apache.jena.ontology.OntModel ;
-import org.apache.jena.ontology.OntModelSpec ;
-import org.apache.jena.rdf.model.* ;
-import org.apache.jena.reasoner.Reasoner ;
-import org.apache.jena.reasoner.ReasonerRegistry ;
-import org.apache.jena.reasoner.ValidityReport ;
-import org.apache.jena.reasoner.rulesys.FBRuleInfGraph ;
-import org.apache.jena.util.FileManager ;
-import org.apache.jena.vocabulary.OWL ;
-import org.apache.jena.vocabulary.RDF ;
-import org.apache.jena.vocabulary.RDFS ;
+import java.io.StringReader;
+import java.util.Iterator;
 
 /**
  * Misc. tests of the OWL rule engine configurations which
@@ -117,10 +122,10 @@ public class TestOWLMisc extends TestCase  {
      */
     public void testOWLPropertyAxioms() {
         Model data = ModelFactory.createDefaultModel();
-        Resource fp = data.createResource("urn:x-hp:eg/fp");
-        Resource ifp = data.createResource("urn:x-hp:eg/ifp");
-        Resource tp = data.createResource("urn:x-hp:eg/tp");
-        Resource sp = data.createResource("urn:x-hp:eg/sp");
+        Resource fp = data.createResource("urn:example:test/fp");
+        Resource ifp = data.createResource("urn:example:test/ifp");
+        Resource tp = data.createResource("urn:example:test/tp");
+        Resource sp = data.createResource("urn:example:test/sp");
         data.add(fp, RDF.type, OWL.FunctionalProperty);
         data.add(ifp, RDF.type, OWL.InverseFunctionalProperty);
         data.add(tp, RDF.type, OWL.TransitiveProperty);

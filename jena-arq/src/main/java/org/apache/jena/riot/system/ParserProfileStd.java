@@ -18,13 +18,15 @@
 
 package org.apache.jena.riot.system;
 
-import org.apache.jena.atlas.lib.Cache;
-import org.apache.jena.atlas.lib.CacheFactory;
+import java.util.Objects;
+
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.graph.*;
-import org.apache.jena.iri.IRI;
-import org.apache.jena.irix.*;
+import org.apache.jena.irix.IRIException;
+import org.apache.jena.irix.IRIx;
+import org.apache.jena.irix.IRIxResolver;
+import org.apache.jena.irix.RelativeIRIException;
 import org.apache.jena.query.ARQ;
 import org.apache.jena.riot.RiotException;
 import org.apache.jena.riot.tokens.Token;
@@ -46,19 +48,18 @@ public class ParserProfileStd implements ParserProfile {
     private final boolean strictMode;
     private final boolean checking;
     private static int DftCacheSize = 500;
-    private final Cache<String, IRI> iriCache;
 
     private boolean allowNodeExtentions;
 
-    public ParserProfileStd(FactoryRDF factory, ErrorHandler errorHandler, IRIxResolver resolver, PrefixMap prefixMap, Context context,
+    public ParserProfileStd(FactoryRDF factory, ErrorHandler errorHandler,
+                            IRIxResolver resolver, PrefixMap prefixMap, Context context,
                             boolean checking, boolean strictMode) {
         this.factory = factory;
         this.errorHandler = errorHandler;
-        this.resolver = resolver;
+        this.resolver = Objects.requireNonNull(resolver);
         this.prefixMap = prefixMap;
         this.context = context;
         this.checking = checking;
-        this.iriCache = checking ? CacheFactory.createCache(DftCacheSize) : null;
         this.strictMode = strictMode;
         this.allowNodeExtentions = true; // (context.isTrue(RIOT.ALLOW_NODE_EXT)) ;
     }
@@ -85,6 +86,11 @@ public class ParserProfileStd implements ParserProfile {
 
     @Override
     public void setBaseIRI(String baseIRIstr) {
+        // Resolver never null but it might have a null base URI.
+        if ( baseIRIstr == null ) {
+            this.resolver = resolver.resetBase(null);
+            return;
+        }
         IRIx newBase = resolver.resolve(baseIRIstr);
         this.resolver = resolver.resetBase(newBase);
     }
@@ -95,7 +101,6 @@ public class ParserProfileStd implements ParserProfile {
             errorHandler.warning("Bad IRI: <" + uriStr + "> Spaces are not legal in URIs/IRIs.", line, col);
             return IRIx.createAny(uriStr);
         }
-
         try {
             IRIx iri = resolver.resolve(uriStr);
             if ( checking )
@@ -105,7 +110,6 @@ public class ParserProfileStd implements ParserProfile {
             errorHandler.error("Relative IRI: " + uriStr, line, col);
             return IRIx.createAny(uriStr);
         } catch (IRIException ex) {
-            // Same code as Checker.iriViolations
             String msg = ex.getMessage();
             Checker.iriViolationMessage(uriStr, true, msg, line, col, errorHandler);
             return IRIx.createAny(uriStr);
@@ -113,18 +117,19 @@ public class ParserProfileStd implements ParserProfile {
     }
 
     private void doChecking(IRIx irix, String uriStr, long line, long col) {
-        // Should become ...
-//        irix.handleViolations((isError, message)->{
-//            if ( isError )
-//                errorHandler.error(message, line, col);
-//        });
+        if ( irix.isRelative() ) {
+            // Relative IRIs.
+            Checker.iriViolationMessage(irix.str(), true, "Relative IRI: " + irix.str(), line, col, errorHandler);
+            // And other warnings.
+        }
 
-        IRI iri;
-        if ( irix instanceof IRIProviderJenaIRI.IRIxJena )
-            iri = (IRI)irix.getImpl();
-        else
-            iri = iriCache.getOrFill(uriStr, () -> SetupJenaIRI.iriCheckerFactory().create(uriStr));
-        Checker.iriViolations(iri, errorHandler, false, true, line, col);
+        if ( ! irix.hasViolations() )
+            return;
+
+        irix.handleViolations((isError, message)->{
+            Checker.iriViolationMessage(uriStr, isError, message, line, col, errorHandler);
+        });
+
     }
 
     /**
@@ -190,6 +195,11 @@ public class ParserProfileStd implements ParserProfile {
             // Really is an URI!
             x = resolveIRI(x, line, col);
         return factory.createURI(x);
+    }
+
+    @Override
+    public Node createURI(IRIx iriX, long line, long col) {
+        return factory.createURI(iriX.str());
     }
 
     @Override
@@ -311,6 +321,13 @@ public class ParserProfileStd implements ParserProfile {
                 return null;
             }
         }
+    }
+
+    @Override
+    public String getBaseURI() {
+        if ( resolver == null )
+            return null;
+        return resolver.getBaseURI();
     }
 
     @Override

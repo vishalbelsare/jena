@@ -24,17 +24,17 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.commons.collections4.BidiMap;
+import org.apache.commons.collections4.bidimap.DualHashBidiMap;
 import org.apache.jena.atlas.logging.Log;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
-import org.apache.jena.ext.com.google.common.collect.BiMap;
-import org.apache.jena.ext.com.google.common.collect.EnumHashBiMap;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.impl.LiteralLabel;
 import org.apache.jena.sparql.graph.NodeConst;
 import org.apache.jena.sparql.util.NodeUtils;
-import org.apache.jena.sparql.util.Utils;
+import org.apache.jena.sparql.util.XSDNumUtils;
 import org.apache.jena.tdb2.TDBException;
 import org.apache.jena.tdb2.store.value.*;
 
@@ -51,7 +51,7 @@ import org.apache.jena.tdb2.store.value.*;
  * guarantee that all integers, say, are store inline.
  *
  * <ul>
- * <li>Integer format: signed 56 bit number, the type filed has the XSD type.
+ * <li>Integer format: signed 56 bit number, the type field has the XSD type.
  * <li>Decimal format: 8 bits scale, 48bits of signed valued. See {@link DecimalNode56}.
  * <li>Date and DateTime
  * <li>Boolean
@@ -94,7 +94,7 @@ public class NodeIdInline {
     };
 
     // Integer derived types.
-    private static BiMap<NodeIdType, RDFDatatype> derivedTypeMap = EnumHashBiMap.create(NodeIdType.class);
+    private static BidiMap<NodeIdType, RDFDatatype> derivedTypeMap = new DualHashBidiMap<>();
     static {
         derivedTypeMap.put(NodeIdType.XSD_LONG, XSDDatatype.XSDlong);
         derivedTypeMap.put(NodeIdType.XSD_INT, XSDDatatype.XSDint);
@@ -185,7 +185,7 @@ public class NodeIdInline {
                     return null;
 
                 // Derived types.
-                NodeIdType type = derivedTypeMap.inverse().getOrDefault(lit.getDatatype(), NodeIdType.XSD_INTEGER);
+                NodeIdType type = derivedTypeMap.inverseBidiMap().getOrDefault(lit.getDatatype(), NodeIdType.XSD_INTEGER);
 
                 try {
                     long v = ((Number)lit.getValue()).longValue();
@@ -277,24 +277,24 @@ public class NodeIdInline {
             {
                 long val = IntegerNode.unpack56(nodeId.value2);
                 RDFDatatype dt = derivedTypeMap.getOrDefault(type, XSDDatatype.XSDinteger);
-                Node n = NodeFactory.createLiteral(Long.toString(val), dt);
+                Node n = NodeFactory.createLiteralDT(Long.toString(val), dt);
                 return n;
             }
             case XSD_DECIMAL : {
-                BigDecimal d = DecimalNode56.unpackAsBigDecimal(nodeId.value2);
-                String x = d.toPlainString();
-                return NodeFactory.createLiteral(x, XSDDatatype.XSDdecimal);
+                BigDecimal decimal = DecimalNode56.unpackAsBigDecimal(nodeId.value2);
+                String x = XSDNumUtils.stringForm(decimal);
+                return NodeFactory.createLiteralDT(x, XSDDatatype.XSDdecimal);
             }
             case XSD_DOUBLE: {
                 double d = DoubleNode62.unpack(nodeId.value2);
-                String xsdStr = Utils.stringForm(d);
-                Node n = NodeFactory.createLiteral(xsdStr, XSDDatatype.XSDdouble);
+                String xsdStr = XSDNumUtils.stringForm(d);
+                Node n = NodeFactory.createLiteralDT(xsdStr, XSDDatatype.XSDdouble);
                 return n;
             }
             case XSD_FLOAT: {
                 float f = FloatNode.unpack(nodeId.value2);
-                String xsdStr = Utils.stringForm(f);
-                Node n = NodeFactory.createLiteral(xsdStr, XSDDatatype.XSDfloat);
+                String xsdStr = XSDNumUtils.stringForm(f);
+                Node n = NodeFactory.createLiteralDT(xsdStr, XSDDatatype.XSDfloat);
                 return n;
             }
             case XSD_DATETIMESTAMP:
@@ -302,12 +302,12 @@ public class NodeIdInline {
                 RDFDatatype dt = (type==XSD_DATETIMESTAMP) ? XSDDatatype.XSDdateTimeStamp : XSDDatatype.XSDdateTime;
                 long val = nodeId.getValue2();
                 String lex = DateTimeNode.unpackDateTime(val);
-                return NodeFactory.createLiteral(lex, dt);
+                return NodeFactory.createLiteralDT(lex, dt);
             }
             case XSD_DATE : {
                 long val = nodeId.getValue2();
                 String lex = DateTimeNode.unpackDate(val);
-                return NodeFactory.createLiteral(lex, XSDDatatype.XSDdate);
+                return NodeFactory.createLiteralDT(lex, XSDDatatype.XSDdate);
             }
             case XSD_BOOLEAN : {
                 long val = nodeId.getValue2();

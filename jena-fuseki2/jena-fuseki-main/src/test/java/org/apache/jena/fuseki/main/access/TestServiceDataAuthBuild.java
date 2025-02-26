@@ -18,18 +18,20 @@
 
 package org.apache.jena.fuseki.main.access;
 
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+
 import org.apache.jena.fuseki.main.FusekiServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 
 /**
  * AbstractTestServiceDatasetAuth with a configuration file.
  */
 public class TestServiceDataAuthBuild extends AbstractTestServiceDatasetAuth {
 
-    static FusekiServer server;
+    private FusekiServer server;
 
-    @BeforeClass public static void beforeClass () {
+    @BeforeEach public void before() {
         server = FusekiServer.create()
             //.verbose(true)
             .port(port)
@@ -38,7 +40,7 @@ public class TestServiceDataAuthBuild extends AbstractTestServiceDatasetAuth {
         server.start();
     }
 
-    @AfterClass public static void afterClass () {
+    @AfterEach public void after () {
         server.stop();
     }
 

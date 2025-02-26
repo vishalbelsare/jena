@@ -32,7 +32,6 @@ import org.apache.jena.query.QueryExecutionFactory;
 import org.apache.jena.query.QuerySolutionMap;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.riot.other.G;
 import org.apache.jena.shacl.ShaclException;
 import org.apache.jena.shacl.engine.Parameter;
 import org.apache.jena.shacl.engine.constraint.SparqlComponent;
@@ -42,6 +41,7 @@ import org.apache.jena.sparql.core.DatasetGraphFactory;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.syntax.syntaxtransform.QueryTransformOps;
 import org.apache.jena.sparql.util.ModelUtils;
+import org.apache.jena.system.G;
 
 public class EvalSparql {
     // Maybe Merge with SparqlValidation
@@ -50,6 +50,7 @@ public class EvalSparql {
 
     private static boolean USE_QueryTransformOps = true;
 
+    @SuppressWarnings("removal")
     public static Collection<Node> evalSparqlComponent(Graph data, Node node, SparqlComponent sparqlComponent) {
         checkForRequiredParams(data, node, sparqlComponent);
 
@@ -61,7 +62,7 @@ public class EvalSparql {
             // Done with QueryTransformOps.transform
             DatasetGraph dsg = DatasetGraphFactory.wrap(data);
             Map<Var, Node> substitutions = parametersToSyntaxSubstitutions(data, node, sparqlComponent.getParams());
-            Query query2 = QueryTransformOps.transform(query, substitutions);
+            Query query2 = QueryTransformOps.replaceVars(query, substitutions);
             try ( QueryExecution qExec = QueryExecutionFactory.create(query2, dsg)) {
                 return evalSparqlOneVar(qExec);
             }

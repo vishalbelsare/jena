@@ -33,7 +33,7 @@ class FusekiService {
   }
 
   /**
-   * Gets the Fuseki URL, only the pathname onward. The protocol, server, port, etc,
+   * Gets the Fuseki URL, only the pathname onward. The protocol, server, port, etc.,
    * are left to the browser/JS engine & Vue to choose. Previously we were passing
    * strings such as `/#/ping$`. But this did not work when the application was
    * deployed on a Tomcat server, for example, where the base URL could be something
@@ -142,11 +142,11 @@ class FusekiService {
       })
     } catch (error) {
       if (error.response) {
-        if (error.response.status !== 200) {
-          if (error.response.status === 409) {
+        if (error.response.statusCode !== 200) {
+          if (error.response.statusCode === 409) {
             throw new Error(`failed to create dataset "${datasetName}", reason: there is another dataset with the same name`)
           }
-          throw new Error(`failed to create dataset "${datasetName}" with type ${datasetType}, reason: HTTP status: "${error.response.status}", message: ${error.response.statusText}`)
+          throw new Error(`failed to create dataset "${datasetName}" with type ${datasetType}, reason: HTTP status: "${error.response.statusCode}", message: ${error.response.statusText}`)
         }
       }
       throw error
@@ -181,9 +181,31 @@ class FusekiService {
     return results
   }
 
-  async fetchGraph (datasetName, graphName) {
+  /**
+   * Get the data endpoint out of a list of server endpoints.
+   *
+   * For now, we are simply returning the first non-empty, but that
+   * may change at some point.
+   *
+   * @private
+   * @param {string[]} serverEndpoints - list of server endpoints in the dataset (can be an empty list).
+   */
+  getDataEndpoint(serverEndpoints) {
+    return serverEndpoints.find(endpoint => endpoint !== '') || ''
+  }
+
+  /**
+   * Fetch a graph.
+   * @param {string} datasetName - Jena dataset name.
+   * @param {string[]} serverEndpoints - list of server endpoints in the dataset (can be an empty list).
+   * @param {string} graphName - name of the graph being accessed.
+   * @return {Promise<AxiosResponse<any>>}
+   */
+  async fetchGraph (datasetName, serverEndpoints, graphName) {
+    const dataEndpoint = this.getDataEndpoint(serverEndpoints)
+    const urlPart = `${datasetName}/${dataEndpoint}`
     return await axios
-      .get(this.getFusekiUrl(`/${datasetName}`), {
+      .get(this.getFusekiUrl(urlPart), {
         params: {
           graph: graphName
         },
@@ -193,9 +215,19 @@ class FusekiService {
       })
   }
 
-  async saveGraph (datasetName, graphName, code) {
+  /**
+   * Save a graph.
+   * @param {string} datasetName - Jena dataset name.
+   * @param {string[]} serverEndpoints - list of server endpoints in the dataset (can be an empty list).
+   * @param {string} graphName - name of the graph being accessed.
+   * @param {string} code - graph content.
+   * @return {Promise<AxiosResponse<any>>}
+   */
+  async saveGraph (datasetName, serverEndpoints, graphName, code) {
+    const dataEndpoint = this.getDataEndpoint(serverEndpoints)
+    const urlPart = `${datasetName}/${dataEndpoint}`
     return await axios
-      .put(this.getFusekiUrl(`/${datasetName}`), code, {
+      .put(this.getFusekiUrl(urlPart), code, {
         params: {
           graph: graphName
         },

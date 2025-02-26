@@ -22,8 +22,7 @@
   <parent>
     <groupId>org.apache.jena</groupId>
     <artifactId>jena</artifactId>
-    <version>4.8.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <version>5.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>jena-base</artifactId>
   <name>Apache Jena - Base</name>
@@ -42,12 +41,6 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
 
-    <dependency>
-      <groupId>org.apache.jena</groupId>
-      <artifactId>jena-shaded-guava</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
-    </dependency>
-    
     <!-- For compiling the log4j2 helper code. -->
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
@@ -85,17 +78,34 @@
       <artifactId>commons-compress</artifactId>
     </dependency>
 
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+
+    <!--
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    -->
+
     <!-- supports persistent data structures -->
     <dependency>
       <groupId>com.github.andrewoma.dexx</groupId>
       <artifactId>collection</artifactId>
     </dependency>
-    
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
-    </dependency>
+
+     <dependency>
+       <groupId>org.junit.vintage</groupId>
+       <artifactId>junit-vintage-engine</artifactId>
+       <scope>test</scope>
+     </dependency>
 
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -105,7 +115,7 @@
 
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
+      <artifactId>log4j-slf4j2-impl</artifactId>
       <scope>test</scope>
     </dependency>
 
@@ -152,6 +162,7 @@
         <configuration>
           <windowtitle>Apache Jena Base</windowtitle>
           <doctitle>Apache Jena Base ${project.version}</doctitle>
+          <encoding>UTF-8</encoding>
         </configuration>
       </plugin>
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,11 +20,9 @@ package org.apache.jena.atlas.io;
 
 import java.io.StringWriter ;
 
-public class StringWriterI extends Writer2
-{
-    public StringWriterI()
-    {
-        super(new StringWriter()) ;
+public class StringWriterI extends Writer2 {
+    public StringWriterI() {
+        super(new StringWriter());
     }
 }
 

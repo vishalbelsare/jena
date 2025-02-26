@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,8 +21,8 @@ package org.apache.jena.fuseki.ctl;
 import java.io.IOException;
 import java.util.Iterator;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.jena.atlas.io.IO;
 import org.apache.jena.fuseki.server.*;
@@ -38,12 +38,12 @@ public class ActionStatsText extends ActionCtl
 
     @Override
     public void validate(HttpAction action) {
-        switch(action.getMethod() ) {
+        switch(action.getRequestMethod() ) {
             case HttpNames.METHOD_GET:
             case HttpNames.METHOD_POST:
                 return;
             default:
-                ServletOps.errorMethodNotAllowed(action.getMethod());
+                ServletOps.errorMethodNotAllowed(action.getRequestMethod());
         }
     }
 

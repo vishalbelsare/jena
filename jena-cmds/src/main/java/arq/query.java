@@ -22,6 +22,7 @@ import java.io.PrintStream;
 
 import arq.cmdline.* ;
 import org.apache.commons.io.output.NullPrintStream;
+import org.apache.jena.Jena;
 import org.apache.jena.atlas.io.IO;
 import org.apache.jena.atlas.io.IndentedWriter ;
 import org.apache.jena.atlas.lib.Lib ;
@@ -60,27 +61,27 @@ public class query extends CmdARQ
     protected ModResultsOut modResults =  new ModResultsOut() ;
     protected ModEngine     modEngine =   new ModEngine() ;
 
-    public static void main (String... argv)
-    {
-        new query(argv).mainRun() ;
+    public static void main(String...argv) {
+        new query(argv).mainRun();
     }
 
-    public query(String[] argv)
-    {
-        super(argv) ;
-        modQuery = new ModQueryIn(getDefaultSyntax()) ;
-        modDataset = setModDataset() ;
+    public query(String[] argv) {
+        super(argv);
+        modQuery = new ModQueryIn(getDefaultSyntax());
+        modDataset = setModDataset();
+        modVersion.addClass(null, Jena.class);
 
-        super.addModule(modQuery) ;
-        super.addModule(modResults) ;
-        super.addModule(modDataset) ;
-        super.addModule(modEngine) ;
-        super.addModule(modTime) ;
+        super.addModule(modQuery);
+        super.addModule(modResults);
+        super.addModule(modDataset);
+        super.addModule(modEngine);
+        super.addModule(modTime);
 
-        super.getUsage().startCategory("Control") ;
-        super.add(argExplain,  "--explain", "Explain and log query execution") ;
-        super.add(argRepeat,   "--repeat=N or N,M", "Do N times or N warmup and then M times (use for timing to overcome start up costs of Java)");
-        super.add(argOptimize, "--optimize=", "Turn the query optimizer on or off (default: on)") ;
+        super.getUsage().startCategory("Control");
+        super.add(argExplain, "--explain", "Explain and log query execution");
+        super.add(argRepeat, "--repeat=N or N,M",
+                  "Do N times or N warmup and then M times (use for timing to overcome start up costs of Java)");
+        super.add(argOptimize, "--optimize=", "Turn the query optimizer on or off (default: on)");
     }
 
     /** Default syntax used when the syntax can not be determined from the command name or file extension
@@ -150,8 +151,8 @@ public class query extends CmdARQ
 
         // Warm up.
         for ( int i = 0 ; i < warmupCount ; i++ )
-            // Include the results format so that is warmed up as well. 
-            queryExec(false, modResults.getResultsFormat(), NullPrintStream.NULL_PRINT_STREAM) ;
+            // Include the results format so that is warmed up as well.
+            queryExec(false, modResults.getResultsFormat(), NullPrintStream.INSTANCE) ;
 
         for ( int i = 0 ; i < repeatCount ; i++ )
             queryExec(modTime.timingEnabled(),  modResults.getResultsFormat(), System.out) ;
@@ -161,6 +162,7 @@ public class query extends CmdARQ
             String avgStr = modTime.timeStr(avg) ;
             System.err.println("Total time: "+modTime.timeStr(totalTime)+" sec for repeat count of "+repeatCount+ " : average: "+avgStr) ;
         }
+        modEngine.resetRegistrations();
     }
 
     @Override
@@ -209,8 +211,7 @@ public class query extends CmdARQ
     }
 
     protected long totalTime = 0 ;
-    protected void queryExec(boolean timed, ResultsFormat fmt, PrintStream resultsDest)
-    {
+    protected void queryExec(boolean timed, ResultsFormat fmt, PrintStream resultsDest) {
         try {
             Query query = getQuery() ;
             if ( isVerbose() ) {

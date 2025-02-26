@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -33,6 +33,15 @@ public class RowSetReaderRegistry {
     public static RowSetReaderFactory getFactory(Lang lang) {
         Objects.requireNonNull(lang);
         return registry.get(lang);
+    }
+
+    /** Create a {@link RowSetReader} for {@link Lang} or return null. */
+    public static RowSetReader createReader(Lang lang) {
+        Objects.requireNonNull(lang);
+        RowSetReaderFactory factory = getFactory(lang);
+        if ( factory == null )
+            return null;
+        return factory.create(lang);
     }
 
     /** Register a {@link RowSetReaderFactory} for a {@link Lang} */

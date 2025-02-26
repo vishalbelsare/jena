@@ -33,13 +33,13 @@ public class Auth {
     public static final String dftRealm = "TripleStore";
 
     /** Any authenticated user. */
-    public static AuthPolicy ANY_USER = (user) -> user != null;
+    public static AuthPolicy ANY_USER   = (user) -> user != null;
 
     /** Any user, whether authenticated or not. */
-    public static AuthPolicy ANY_ANON = (user) -> true;
+    public static AuthPolicy ANY_ANON   = (user) -> true;
 
     /** Never allow. */
-    public static AuthPolicy DENY     = (user) -> false;
+    public static AuthPolicy DENY_ALL   = (user) -> false;
 
     /** A policy that allows specific users (convenience wrapped for {@link #policyAllowSpecific(Collection)}). */
     public static AuthPolicy policyAllowSpecific(String... allowedUsers) {
@@ -49,27 +49,36 @@ public class Auth {
     /**
      * A policy that allows specific users.
      * <ul>
+     * <li>If any user is {@linkplain Users#UserDenyAll}, then this policy is the same as {@linkplain #DENY_ALL}.
      * <li>If any user is {@linkplain Users#UserAnyLoggedIn}, then this policy is the same as {@linkplain #ANY_USER}.
      * <li>If any user is {@linkplain Users#UserAnyAnon}, then this policy is the same as {@linkplain #ANY_ANON}.
      * </ul>
      */
     public static AuthPolicy policyAllowSpecific(Collection<String> allowedUsers) {
         Objects.requireNonNull(allowedUsers, "allowedUsers");
+
+        if ( allowedUsers.isEmpty() )
+            return Auth.DENY_ALL;
+        if ( allowedUsers.contains(Users.UserDenyAll) ) {
+            // The "Deny" user can only be used on it's own.
+            if ( allowedUsers.size() > 1 )
+                Fuseki.configLog.warn("Both '!' (deny all) and a list of users given");
+            return Auth.DENY_ALL;
+        }
+
         if ( allowedUsers.contains(Users.UserAnyLoggedIn) ) {
             if ( allowedUsers.size() > 1 )
                 Fuseki.configLog.warn("Both 'any user' and a list of users given");
-            return ANY_USER;
+            return Auth.ANY_USER;
         }
         if ( allowedUsers.contains(Users.UserAnyAnon) ) {
             if ( allowedUsers.size() > 1 )
                 Fuseki.configLog.warn("Both 'anon user' and a list of users given");
-            return ANY_ANON;
+            return Auth.ANY_ANON;
         }
 
         if ( allowedUsers.stream().anyMatch(Objects::isNull) )
             throw new FusekiConfigException("null user found : "+allowedUsers);
-        if ( allowedUsers.isEmpty() )
-            return Auth.DENY;
         return new AuthUserList(allowedUsers);
     }
 
@@ -77,8 +86,8 @@ public class Auth {
      * Test whether a user (principal) is allowed by a authorization policy.
      * The policy can be null, meaning no restrictions, and the function returns true.
      * {@code user} maybe null, meaning unauthenticated and any policy must deal with this.
-     * @param user
-     * @param policy
+     * @param user User
+     * @param policy Policy
      * @return boolean True if the policy is null or allows the user.
      */
     public static boolean allow(String user, AuthPolicy policy) {
@@ -94,8 +103,8 @@ public class Auth {
      * Additional, return true/false - see {@link #allow(String, AuthPolicy)}.
      * The policy can be null, meaning no restrictions, and the function returns true.
      * {@code user} maybe null, meaning unauthenticated and any policy must deal with this.
-     * @param user
-     * @param policy
+     * @param user User
+     * @param policy Policy
      * @param notAllowed Runnable to execute if the policy does not allow the user.
      */
     public static boolean allow(String user, AuthPolicy policy, Runnable notAllowed) {
@@ -112,7 +121,7 @@ public class Auth {
      * <p>
      * Unlike digest auth, basic auth can be setup without an extra round trip to the
      * server, making it easier for scripts where the body is not replayable.
-     * 
+     *
      * @param username
      * @param password
      * @return String

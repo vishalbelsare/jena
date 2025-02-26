@@ -35,6 +35,7 @@ import org.apache.jena.riot.system.RiotChars;
 import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.sparql.ARQConstants;
 import org.apache.jena.sparql.core.Quad;
+import org.apache.jena.sys.JenaSystem;
 
 /** Presentation utilities for Nodes, Triples, Quads and more.
  * <p>
@@ -45,12 +46,14 @@ import org.apache.jena.sparql.core.Quad;
  */
 public class NodeFmtLib
 {
+    static { JenaSystem.init(); }
+
     // Replaces FmtUtils
     // See and use EscapeStr
 
     // Turtle formatter, no prefix map or base. Does literal abbreviations.
     private static final NodeFormatter ttlFormatter = new NodeFormatterTTL();
-    // N-triples formatter, no prefix map or base. Does literal abbreviations.
+    // N-triples formatter, no prefix map or base. Does not do literal abbreviations.
     private static final NodeFormatter ntFormatter = new NodeFormatterNT();
     private static final String nullStr = "<null>";
 
@@ -59,8 +62,8 @@ public class NodeFmtLib
     static {
         PrefixMapping pm = ARQConstants.getGlobalPrefixMap();
         Map<String, String> map = pm.getNsPrefixMap();
-        for ( Map.Entry<String, String> e : map.entrySet() )
-            dftPrefixMap.add(e.getKey(), e.getValue() );
+        for ( Map.Entry<String, String> e : map.entrySet())
+            dftPrefixMap.add(e.getKey(), e.getValue());
     }
 
     /** Format a triple, using Turtle literal abbreviations. */
@@ -73,10 +76,30 @@ public class NodeFmtLib
         return strNodesTTL(q.getGraph(), q.getSubject(), q.getPredicate(), q.getObject());
     }
 
-    /** @deprecated Use {@link #strNT}. */
-    @Deprecated
-    public static String str(Node node) {
-        return strNT(node);
+    /** Format a triple as N-Triples. */
+    public static String strNT(Triple triple) {
+        return strNQ(triple.getSubject(), triple.getPredicate(), triple.getObject(), null);
+    }
+
+    /** Format a quad as N-Quads. */
+    public static String strNQ(Quad quad) {
+        return strNQ(quad.getSubject(), quad.getPredicate(), quad.getObject(), quad.getGraph());
+    }
+
+    /** Format the components of a quad as N-Quads. The graph component may be null. */
+    public static String strNQ(Node s, Node p, Node o, Node g) {
+        StringBuilder result = new StringBuilder();
+        result.append(strNT(s));
+        result.append(" ");
+        result.append(strNT(p));
+        result.append(" ");
+        result.append(strNT(o));
+        if (g != null && !Quad.isDefaultGraph(g)) {
+            result.append(" ");
+            result.append(strNT(g));
+        }
+        result.append(" .");
+        return result.toString();
     }
 
     /** With Turtle abbreviation for literals, no prefixes of base URI */
@@ -86,7 +109,7 @@ public class NodeFmtLib
 
     /** Format in N-triples style. */
     public static String strNT(Node node) {
-        return strNode(node, ttlFormatter);
+        return strNode(node, ntFormatter);
     }
 
     /** Format in N-triples style. */
@@ -111,12 +134,6 @@ public class NodeFmtLib
         return sw.toString();
     }
 
-    /** Use {@link #strNodesNT} or {@link #strNodesTTL} */
-    @Deprecated
-    public static String strNodes(Node...nodes) {
-        return strNodesNT(nodes);
-    }
-
     public static String strNodesNT(Node...nodes) {
         return strNodes(NodeFmtLib::strNT, nodes);
     }
@@ -139,12 +156,6 @@ public class NodeFmtLib
             output.accept(sw, n);
         }
         return sw.toString();
-    }
-
-    /** @deprecated To be removed. */
-    @Deprecated
-    public static void serialize(IndentedWriter w, Node node, String base, PrefixMap prefixMap) {
-        formatNode(w, node, base, prefixMap);
     }
 
     private static void formatNode(IndentedWriter w, Node node, NodeFormatter formatter) {
@@ -179,6 +190,12 @@ public class NodeFmtLib
         return displayStrNodes(t.getSubject(), t.getPredicate(), t.getObject());
     }
 
+    public static String displayStr(Quad q) {
+        if ( q == null )
+            return nullStr;
+        return displayStrNodes(q.getGraph(), q.getSubject(), q.getPredicate(), q.getObject());
+    }
+
     public static String displayStr(Node node) {
         if ( node == null )
             return nullStr;
@@ -195,19 +212,26 @@ public class NodeFmtLib
     // ---- Blank node labels.
 
     // Strict N-triples only allows [A-Za-z][A-Za-z0-9]
-    static char encodeMarkerChar = 'X';
+    private static final char encodeMarkerChar = 'X';
 
     // These two form a pair to convert bNode labels to a safe (i.e. legal N-triples form) and back again.
 
-    // Encoding is:
-    // 1 - Add a Letter
-    // 2 - Hexify, as Xnn, anything outside ASCII A-Za-z0-9
-    // 3 - X is encoded as XX
+    /**
+     *  Encoding is:
+     *  <ul>
+     *  <li> Add a start letter
+     *  <li> Hexify, as Xnn, anything outside ASCII A-Za-z0-9
+     *  <li> X is encoded as XX
+     */
 
-    private static char LabelLeadingLetter = 'B';
+    private static final char LabelLeadingLetter = 'B';
 
     public static String encodeBNodeLabel(String label) {
-        StringBuilder buff = new StringBuilder();
+        // The common case is a UUID string of 36 characters including 4 dashes.
+        // Dashes encode as X2D.
+        // Together with the leading 'B', a total of 45 characters.
+        // 48 is greater than 45 and 8 byte aligned.
+        StringBuilder buff = new StringBuilder(48);
         // Must be at least one char and not a digit.
         buff.append(LabelLeadingLetter);
 

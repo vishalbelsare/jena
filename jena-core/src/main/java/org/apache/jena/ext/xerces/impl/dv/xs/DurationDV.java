@@ -24,7 +24,6 @@ import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.Duration;
 
 import org.apache.jena.ext.xerces.impl.dv.InvalidDatatypeValueException;
-import org.apache.jena.ext.xerces.impl.dv.ValidationContext;
 
 /**
  * Validator for &lt;duration&gt; datatype (W3C Schema Datatypes)
@@ -53,7 +52,7 @@ public class DurationDV extends AbstractDateTimeDV {
         new DateTimeData(1903, 7, 1, 0, 0, 0, 'Z', null, true, null)};
 
     @Override
-    public Object getActualValue(String content, ValidationContext context) throws InvalidDatatypeValueException{
+    public Object getActualValue(String content) throws InvalidDatatypeValueException{
         try{
             return parse(content, DURATION_TYPE);
         } catch (Exception ex) {
@@ -351,7 +350,7 @@ public class DurationDV extends AbstractDateTimeDV {
 
     @Override
     protected String dateToString(DateTimeData date) {
-        StringBuffer message = new StringBuffer(30);
+        StringBuilder message = new StringBuilder(30);
         if ( date.year<0 || date.month<0 || date.day<0
                 || date.hour<0 || date.minute<0 || date.second<0) {
             message.append('-');

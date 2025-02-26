@@ -29,15 +29,16 @@ import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprEvalException;
 import org.apache.jena.sparql.expr.NodeValue;
 import org.apache.jena.sparql.function.FunctionEnv;
+import org.apache.jena.sparql.function.scripting.ScriptDenyException;
 
 public class VarExprList {
     private List<Var> vars;
     private LinkedHashMap<Var, Expr> exprs;   // Preserve order.
 
-    public VarExprList(List<Var> vars) {
-        this.vars = new ArrayList<>(vars);
-        this.exprs = new LinkedHashMap<>();
-    }
+//    public VarExprList(List<Var> vars) {
+//        this.vars = new ArrayList<>(vars);
+//        this.exprs = new LinkedHashMap<>();
+//    }
 
     public VarExprList(VarExprList other) {
         this.vars = new ArrayList<>(other.vars);
@@ -65,7 +66,7 @@ public class VarExprList {
     /**
      * Call the action for each (variable, expression) defined.
      * Not called when there is no expression, just a variable.
-     * (c.f. {@link #forEachVarExpr}). Not order preserving.
+     * (c.f. {@link #forEachVarExpr}).
      */
     public void forEachExpr(BiConsumer<Var, Expr> action) {
         exprs.forEach(action);
@@ -74,8 +75,6 @@ public class VarExprList {
     /**
      * Call the action for each variable, in order.
      * The expression may be null.
-     * Called when there is no expression, just a variable (c.f.
-     * {@link #forEachExpr}).
      */
     public void forEachVarExpr(BiConsumer<Var, Expr> action) {
         // * See {@link #forEach}
@@ -115,13 +114,16 @@ public class VarExprList {
             if ( nv == null )
                 return null;
             return nv.asNode();
-        } catch (ExprEvalException ex)
-        // { Log.warn(this, "Eval failure "+expr+": "+ex.getMessage()) ; }
-        {}
-        return null;
+        } catch (ScriptDenyException ex) {
+            throw ex;
+        } catch (ExprEvalException ex) {
+            return null;
+        }
     }
 
     public void add(Var var) {
+        if ( var == null )
+            throw new ARQInternalErrorException("Attempt to add a null variable");
         // Checking here controls whether duplicate variables are allowed.
         // Duplicates with expressions are not allowed (add(Var, Expr))
         // See ARQ.allowDuplicateSelectColumns
@@ -138,8 +140,6 @@ public class VarExprList {
             return;
         }
 
-        if ( var == null )
-            throw new ARQInternalErrorException("Attempt to add a named expression with a null variable");
         if ( exprs.containsKey(var) )
             throw new ARQInternalErrorException("Attempt to assign an expression again");
         add(var);
@@ -156,6 +156,17 @@ public class VarExprList {
     public void remove(Var var) {
         vars.remove(var);
         exprs.remove(var);
+    }
+
+    /**
+     * If the variable is already in the VarExprList, replace the expression.
+     * This retains the list order.
+     * Otherwise, add the variable and expression.
+     */
+    public void update(Var var, Expr newExpr) {
+        exprs.put(var, newExpr);
+        if ( ! vars.contains(var) )
+            vars.add(var);
     }
 
     public void clear() {
@@ -181,10 +192,9 @@ public class VarExprList {
     public boolean equals(Object other) {
         if ( this == other )
             return true;
-        if ( !(other instanceof VarExprList) )
+        if ( !(other instanceof VarExprList varExprList) )
             return false;
-        VarExprList x = (VarExprList)other;
-        return Objects.equals(vars, x.vars) && Objects.equals(exprs, x.exprs);
+        return Objects.equals(vars, varExprList.vars) && Objects.equals(exprs, varExprList.exprs);
     }
 
     @Override

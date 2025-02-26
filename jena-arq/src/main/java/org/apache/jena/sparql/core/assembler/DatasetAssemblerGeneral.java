@@ -32,10 +32,13 @@ import org.apache.jena.sparql.graph.GraphFactory ;
 import org.apache.jena.sparql.util.FmtUtils ;
 import org.apache.jena.sparql.util.graph.GraphUtils ;
 
-public class DatasetAssemblerGeneral extends DatasetAssembler implements Assembler {
+public class DatasetAssemblerGeneral extends NamedDatasetAssembler {
+
     public static Resource getType() {
         return DatasetAssemblerVocab.tDataset ;
     }
+
+    public DatasetAssemblerGeneral() {}
 
     @Override
     public DatasetGraph createDataset(Assembler a, Resource root) {

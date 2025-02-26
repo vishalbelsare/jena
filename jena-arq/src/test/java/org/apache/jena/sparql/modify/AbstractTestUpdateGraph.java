@@ -123,7 +123,7 @@ public abstract class AbstractTestUpdateGraph extends AbstractTestUpdateBase
     @Test
     public void testInsert3() {
         DatasetGraph gStore = getEmptyDatasetGraph();
-        gStore.addGraph(graphIRI, Factory.createDefaultGraph());
+        gStore.addGraph(graphIRI, GraphMemFactory.createDefaultGraph());
         UpdateModify insert = new UpdateModify();
         insert.getInsertAcc().addQuad(new Quad(graphIRI, triple1));
         UpdateAction.execute(insert, gStore);
@@ -207,7 +207,7 @@ public abstract class AbstractTestUpdateGraph extends AbstractTestUpdateBase
     public void testModify1() {
         DatasetGraph gStore = getEmptyDatasetGraph();
         defaultGraphData(gStore, data2());
-        namedGraphData(gStore, graphIRI, Factory.createDefaultGraph());
+        namedGraphData(gStore, graphIRI, GraphMemFactory.createDefaultGraph());
 
         UpdateModify modify = new UpdateModify();
         Element element = QueryFactory.createElement("{ ?s <http://example/p> ?o }");
@@ -253,13 +253,14 @@ public abstract class AbstractTestUpdateGraph extends AbstractTestUpdateBase
     public void testModifyInitialBindings() {
         DatasetGraph gStore = getEmptyDatasetGraph();
         defaultGraphData(gStore, data12());
-        namedGraphData(gStore, graphIRI, Factory.createDefaultGraph());
+        namedGraphData(gStore, graphIRI, GraphMemFactory.createDefaultGraph());
 
         Binding initialBinding = BindingFactory.binding(Var.alloc("o"), o1);
 
         UpdateModify modify = new UpdateModify();
         Element element = QueryFactory.createElement("{ ?s <http://example/p> ?o }");
         modify.setElement(element);
+
         modify.getInsertAcc().addQuad(new Quad(graphIRI, triple1));
         modify.getDeleteAcc().addTriple(SSE.parseTriple("(?s <http://example/p> ?o)"));
         modify.getDeleteAcc().addQuad(SSE.parseQuad("(<http://example/graph> ?s <http://example/p> ?o)"));
@@ -436,7 +437,7 @@ public abstract class AbstractTestUpdateGraph extends AbstractTestUpdateBase
     }
 
     private static Graph data(Triple...triples) {
-        Graph graph = Factory.createDefaultGraph();
+        Graph graph = GraphMemFactory.createDefaultGraph();
         for ( Triple t : triples )
             graph.add(t);
         return graph;

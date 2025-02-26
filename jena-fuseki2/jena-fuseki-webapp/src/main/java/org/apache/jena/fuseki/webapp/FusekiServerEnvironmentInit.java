@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,10 +18,11 @@
 
 package org.apache.jena.fuseki.webapp;
 
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
+import jakarta.servlet.ServletContextEvent;
+import jakarta.servlet.ServletContextListener;
 
 import org.apache.jena.fuseki.system.FusekiLogging;
+import org.apache.jena.fuseki.system.FusekiCore;
 import org.apache.jena.sys.JenaSystem;
 
 /** Setup the environment and logging.
@@ -45,10 +46,12 @@ public class FusekiServerEnvironmentInit implements ServletContextListener {
                 // https://logging.apache.org/log4j/2.x/manual/webapp.html
                 FusekiLogging.markInitialized(true);
             } else {
-                FusekiLogging.setLogging(FusekiEnv.FUSEKI_BASE);
+                FusekiLogging.setLogging(FusekiEnv.FUSEKI_BASE, false);
             }
         }
         JenaSystem.init();
+        FusekiCore.init();
+
     }
 
     @Override

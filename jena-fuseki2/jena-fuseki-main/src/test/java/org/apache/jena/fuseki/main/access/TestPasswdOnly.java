@@ -20,19 +20,21 @@ package org.apache.jena.fuseki.main.access;
 
 import static org.apache.jena.fuseki.main.FusekiTestLib.expectOK;
 import static org.apache.jena.fuseki.main.FusekiTestLib.expectQuery401;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import org.apache.jena.atlas.web.WebLib;
 import org.apache.jena.fuseki.main.FusekiServer;
-import org.apache.jena.query.QueryExecution;
 import org.apache.jena.rdfconnection.LibSec;
 import org.apache.jena.rdfconnection.RDFConnection;
+import org.apache.jena.rdflink.RDFLink;
 import org.apache.jena.sparql.core.DatasetGraphFactory;
 import org.apache.jena.sparql.engine.http.QueryExceptionHTTP;
-import org.apache.jena.sparql.util.QueryExecUtils;
+import org.apache.jena.sparql.exec.QueryExec;
 import org.apache.jena.web.AuthSetup;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 /**
  * Test a server with a password file and no other auth policies. Should become a
@@ -41,34 +43,37 @@ import org.junit.Test;
 public class TestPasswdOnly {
     protected static FusekiServer server;
     protected static int port;
+    private static AuthSetup auth1;
 
-    private static AuthSetup auth1 = new AuthSetup("localhost", port, "user1", "pw1", null);
-
-    @BeforeClass public static void beforeClass () {
+    @BeforeAll public static void beforeClass () {
         port = WebLib.choosePort();
         server = FusekiServer.create()
             //.verbose(true)
-            .port(port)
+            .port(0)
             .add("/db", DatasetGraphFactory.createTxnMem())
             .passwordFile("testing/Access/passwd")
             // Should be default.
             //.serverAuthPolicy(Auth.ANY_USER)
             .build();
         server.start();
+        port = server.getPort();
+        auth1 = new AuthSetup("localhost", port, "user1", "pw1", null);
     }
 
-    @AfterClass public static void afterClass () {
+    @AfterAll public static void afterClass () {
         server.stop();
     }
 
     // Bounced by Jetty.
-    @Test(expected=QueryExceptionHTTP.class)
+    @Test
     public void passwd_no_user_A() {
-        try (RDFConnection conn = RDFConnection.queryConnect("http://localhost:" + port + "/db")) {
-            try ( QueryExecution qExec = conn.query("ASK{}") ) {
-                QueryExecUtils.executeQuery(qExec);
+        assertThrows(QueryExceptionHTTP.class, () -> {
+            try (RDFLink conn = RDFLink.queryConnect("http://localhost:" + port + "/db")) {
+                try (QueryExec qExec = conn.query("ASK{}")) {
+                    qExec.ask();
+                }
             }
-        }
+        });
     }
 
     @Test

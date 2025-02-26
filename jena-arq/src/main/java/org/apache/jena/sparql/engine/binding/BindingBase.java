@@ -19,6 +19,8 @@
 package org.apache.jena.sparql.engine.binding;
 
 import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 import org.apache.jena.atlas.iterator.IteratorConcat;
@@ -45,12 +47,18 @@ abstract public class BindingBase implements Binding
 //    public Binding getParent() { return parent; }
 
     @Override
-    final public Iterator<Var> vars()
-    {
+    final public Iterator<Var> vars() {
         Iterator<Var> iter = vars1();
         if ( parent != null )
             iter = IteratorConcat.concat(parent.vars(), iter);
         return iter;
+    }
+
+    @Override
+    final public Set<Var> varsMentioned() {
+        Set<Var> result = new LinkedHashSet<>();
+        vars().forEachRemaining(result::add);
+        return result;
     }
 
     /** Operate on each entry. */
@@ -124,7 +132,7 @@ abstract public class BindingBase implements Binding
 
     @Override
     public String toString() {
-        StringBuffer sbuff = new StringBuffer();
+        StringBuilder sbuff = new StringBuilder();
         format1(sbuff);
 
         if ( parent != null ) {
@@ -138,7 +146,7 @@ abstract public class BindingBase implements Binding
     }
 
     // Do one level of binding
-    public void format1(StringBuffer sbuff) {
+    public void format1(StringBuilder sbuff) {
         if ( isEmpty() ) {
             sbuff.append("()");
             return;
@@ -155,7 +163,7 @@ abstract public class BindingBase implements Binding
         }
     }
 
-    protected void fmtVar(StringBuffer sbuff, Var var) {
+    protected void fmtVar(StringBuilder sbuff, Var var) {
         Node node = get(var);
         String tmp = FmtUtils.stringForObject(node);
         sbuff.append("( ?" + var.getVarName() + " = " + tmp + " )");
@@ -163,7 +171,7 @@ abstract public class BindingBase implements Binding
 
     // Do one level of binding
     public String toString1() {
-        StringBuffer sbuff = new StringBuffer();
+        StringBuilder sbuff = new StringBuilder();
         format1(sbuff);
         return sbuff.toString();
     }
@@ -194,4 +202,19 @@ abstract public class BindingBase implements Binding
         }
         return hash;
     }
+
+    @Override
+    public Binding detach() {
+        Binding newParent = (parent == null) ? null : parent.detach();
+        Binding result = (newParent == parent)
+                ? detachWithOriginalParent()
+                : detachWithNewParent(newParent);
+        return result;
+    }
+
+    protected Binding detachWithOriginalParent() {
+        return this;
+    }
+
+    protected abstract Binding detachWithNewParent(Binding newParent);
 }
