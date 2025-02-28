@@ -16,17 +16,32 @@
  */
 
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import istanbul from "vite-plugin-istanbul";
-const path = require("path")
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern-compiler",
+        silenceDeprecations: ["import", "global-builtin","color-functions","mixed-decls"],
+      }
+    },
+  },
+  base: './',
   plugins: [
     vue(),
     istanbul({
       include: "src/*",
-      exclude: ["node_modules"],
+      exclude: [
+        "**/node_modules/**",
+        "tests",
+        "coverage",
+        "src/services/mock/*"
+      ],
       extension: [".js", ".jsx", ".ts", ".vue"],
       requireEnv: true,
       cypress: true
@@ -41,12 +56,38 @@ export default defineConfig({
     },
   },
   build: {
-    // Our largest chunk: dist/assets/yasqe.min-ec8f4984.js 508.16 kB │ gzip: 130.97 kB
-    chunkSizeWarningLimit: 550,
+    // Our largest chunk: target/webapp/static/Query-CakHSd_3.js  1,172.48 kB │ gzip: 350.95 kB
+    chunkSizeWarningLimit: 1250,
     // Change build paths to make them Maven compatible.
     outDir: 'target/webapp',
     assetsDir: 'static',
-    sourcemap: 'inline',
+    sourcemap: 'inline'
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    css: true,
+    mockReset: true,
+    restoreMocks: true,
+    clearMocks: true,
+    include: [
+      ...configDefaults.include,
+      './tests/unit/**/*.{test,spec}.{.js,ts,jsx,cjs}',
+    ],
+    exclude: [
+      ...configDefaults.exclude,
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/cypress/**',
+      '**/.{idea,git,cache,output,temp}/**',
+    ],
+    coverage: {
+      all: false,
+      exclude: [
+        ...configDefaults.coverage.exclude,
+        '**/node_modules/**',
+      ]
+    }
   },
   server: {
     // Default, can be overridden by `--port 1234` in package.json
@@ -57,8 +98,8 @@ export default defineConfig({
         target: `http://localhost:${process.env.FUSEKI_PORT || 3030}`,
         changeOrigin: true,
         secure: false,
-        ws: true,
-        bypass: (req, res, options) => {
+        ws: false,
+        bypass: (req) => {
           const accept = req.headers.accept
           const contentType = req.headers['content-type']
           // webpack-dev-server automatically handled fall-through, as it was requested (and quickly
@@ -67,9 +108,11 @@ export default defineConfig({
           // So we bypass requests from the proxy that do not contain the header Accept: application/json.*,
           // or that are requesting /node_modules/ (dev Vite/Vue/JS modules).
           const sendToUI =
+            req.url.endsWith('index.html') ||
             req.method !== 'POST' &&
+            req.url.indexOf('tests/reset') < 0 &&
             (
-              (req.hasOwnProperty('originalUrl') && req.originalUrl.includes('node_modules')) ||
+              (Object.prototype.hasOwnProperty.call(req, 'originalUrl') && req.originalUrl.includes('node_modules')) ||
               (
                 (accept !== undefined && accept !== null) &&
                 !(accept.includes('application/json') || accept.includes('text/turtle') || accept.includes('application/sparql-results+json')

@@ -17,11 +17,7 @@
 
 package org.apache.jena.ext.xerces.impl.dv.xs;
 
-import javax.xml.datatype.DatatypeConstants;
-import javax.xml.datatype.XMLGregorianCalendar;
-
 import org.apache.jena.ext.xerces.impl.dv.InvalidDatatypeValueException;
-import org.apache.jena.ext.xerces.impl.dv.ValidationContext;
 
 /**
  * Validator for &lt;gYear&gt; datatype (W3C Schema Datatypes)
@@ -43,7 +39,7 @@ public class YearDV extends AbstractDateTimeDV {
      * @return a valid and normalized time object
      */
     @Override
-    public Object getActualValue(String content, ValidationContext context) throws InvalidDatatypeValueException{
+    public Object getActualValue(String content) throws InvalidDatatypeValueException{
         try{
             return parse(content);
         } catch(Exception ex){
@@ -111,18 +107,10 @@ public class YearDV extends AbstractDateTimeDV {
      */
     @Override
     protected String dateToString(DateTimeData date) {
-        StringBuffer message = new StringBuffer(5);
+        StringBuilder message = new StringBuilder(5);
         append(message, date.year, 4);
         append(message, (char)date.utc, 0);
         return message.toString();
-    }
-    
-    @Override
-    protected XMLGregorianCalendar getXMLGregorianCalendar(DateTimeData date) {
-        return datatypeFactory.newXMLGregorianCalendar(date.unNormYear, DatatypeConstants.FIELD_UNDEFINED, 
-                DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, 
-                DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, 
-                date.hasTimeZone() ? date.timezoneHr * 60 + date.timezoneMin : DatatypeConstants.FIELD_UNDEFINED);
     }
 }
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,12 +18,12 @@
 
 package org.apache.jena.riot.writer;
 
-import org.apache.jena.atlas.io.IndentedWriter ;
-import org.apache.jena.riot.system.PrefixMap ;
-import org.apache.jena.riot.system.StreamRDFOps ;
-import org.apache.jena.riot.system.StreamRDF ;
-import org.apache.jena.sparql.core.DatasetGraph ;
-import org.apache.jena.sparql.util.Context ;
+import org.apache.jena.atlas.io.IndentedWriter;
+import org.apache.jena.riot.system.PrefixMap;
+import org.apache.jena.riot.system.StreamRDFOps;
+import org.apache.jena.riot.system.StreamRDF;
+import org.apache.jena.sparql.core.DatasetGraph;
+import org.apache.jena.sparql.util.Context;
 
 /** TriG writer that writes quads one per line
  *  in TriG form with prefixes and short form literals (e.g. integers)

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -83,7 +83,7 @@ public class TextVocab
      *
      * @deprecated Do not use. To be removed.
      */
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public static final Resource standardFilter = Vocab.resource(NS, "StandardFilter");
 
     public static final Resource lowerCaseFilter    = Vocab.resource(NS, "LowerCaseFilter");

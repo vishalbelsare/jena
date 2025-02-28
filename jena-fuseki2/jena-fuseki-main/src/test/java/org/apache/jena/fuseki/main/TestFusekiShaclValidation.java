@@ -18,18 +18,18 @@
 
 package org.apache.jena.fuseki.main;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import org.apache.jena.atlas.web.WebLib;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import org.apache.jena.graph.Graph;
 import org.apache.jena.http.HttpRDF;
 import org.apache.jena.rdfconnection.RDFConnection;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.shacl.ValidationReport;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 public class TestFusekiShaclValidation {
     // Fuseki Main server
@@ -37,22 +37,22 @@ public class TestFusekiShaclValidation {
     private static String serverURL = null;
     private static final String DIR = "testing/ShaclValidation/";
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
-        int port = WebLib.choosePort();
-
-        FusekiServer server = FusekiServer.create()
-            .port(port)
+        server = FusekiServer.create()
+            .port(0)
             .parseConfigFile(DIR+"config-validation.ttl")
             .build();
         server.start();
-        serverURL = "http://localhost:"+port;
+        serverURL = "http://localhost:"+server.getPort();
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
-        if ( server != null )
+        if ( server != null ) {
             server.stop();
+            server = null;
+        }
     }
 
     @Test

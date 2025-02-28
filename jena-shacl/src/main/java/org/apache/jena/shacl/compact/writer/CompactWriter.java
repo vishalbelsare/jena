@@ -20,8 +20,6 @@ package org.apache.jena.shacl.compact.writer;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
-
 import org.apache.jena.atlas.io.IndentedLineBuffer;
 import org.apache.jena.atlas.io.IndentedWriter;
 import org.apache.jena.atlas.lib.CollectionUtils;
@@ -30,6 +28,7 @@ import org.apache.jena.riot.out.NodeFormatterTTL;
 import org.apache.jena.riot.system.PrefixMap;
 import org.apache.jena.riot.system.Prefixes;
 import org.apache.jena.riot.system.RiotLib;
+import org.apache.jena.riot.writer.DirectiveStyle;
 import org.apache.jena.riot.writer.WriterConst;
 import org.apache.jena.shacl.ShaclException;
 import org.apache.jena.shacl.Shapes;
@@ -49,7 +48,7 @@ public class CompactWriter {
 
         // Formatter PrefixMap - with the std prefixes if not overridden.
         PrefixMap pmapWithStd = SHACLC.withStandardPrefixes();
-        // Add to copy of standrard so it can override any standard settings.
+        // Add to copy of the prefixes standard so we can later override any standard settings.
         pmapWithStd.putAll(graphPrefixMap);
         NodeFormatter nodeFmt = new NodeFormatterTTL(null, pmapWithStd);
 
@@ -60,7 +59,7 @@ public class CompactWriter {
         if ( baseURI != null ) {
             if ( someOutput )
                 out.println();
-            RiotLib.writeBase(out, baseURI, true);
+            RiotLib.writeBase(out, baseURI, DirectiveStyle.KEYWORD);
             someOutput = true;
         }
 
@@ -68,7 +67,7 @@ public class CompactWriter {
         if ( ! graphPrefixMap.isEmpty() ) {
             if ( someOutput )
                 out.println();
-            RiotLib.writePrefixes(out, graphPrefixMap, true);
+            RiotLib.writePrefixes(out, graphPrefixMap, DirectiveStyle.KEYWORD);
             someOutput = true;
         }
 
@@ -107,7 +106,7 @@ public class CompactWriter {
 
     /** Write in compact syntax or skip, noting the fact in a comment */
     private static void writeOneShapeCompactOrSkip(IndentedWriter out, NodeFormatter nodeFmt, ShapeOutputVisitor visitor, Shape sh) {
-        // Write a shape is we can, else comment.
+        // Write a shape if we can, else comment.
         try {
             try ( IndentedLineBuffer out2 = new IndentedLineBuffer() ) {
                 // Need new visitor to hold the IndentedLineBuffer
@@ -122,7 +121,6 @@ public class CompactWriter {
             out.println();
         }
     }
-
 
     private static NodeFormatter formatterPrefixMap(PrefixMapping prefixMapping) {
         PrefixMap pmap = prefixMapWithStd(prefixMapping);
@@ -139,10 +137,10 @@ public class CompactWriter {
     public static void output(IndentedWriter out, NodeFormatter nodeFmt, ShapeOutputVisitor visitor, Shape sh) {
         List<Target> targetImplicitClasses = sh.getTargets().stream()
             .filter(t->t.getTargetType()==TargetType.implicitClass)
-            .collect(Collectors.toList());
+            .toList();
         List<Target> targetClasses = sh.getTargets().stream()
             .filter(t->t.getTargetType()==TargetType.targetClass)
-            .collect(Collectors.toList());
+            .toList();
 
         if ( targetImplicitClasses.isEmpty() ) {
             out.print("shape ");
@@ -181,7 +179,7 @@ public class CompactWriter {
      */
     public static void output(IndentedWriter out, NodeFormatter nodeFmt, Shape sh) {
         // If this were critical for performance, having a "serialization context"
-        // with out, nodeFmt and prefixes" would be better. But this is the only place the
+        // with "out", "nodeFmt" and "prefixes" would be better.
         PrefixMapping prefixMappingWithStd = SHACLC.withStandardPrefixes(sh.getShapeGraph().getPrefixMapping());
         ShapeOutputVisitor visitor = new ShapeOutputVisitor(prefixMappingWithStd, nodeFmt, out);
         sh.visit(visitor);

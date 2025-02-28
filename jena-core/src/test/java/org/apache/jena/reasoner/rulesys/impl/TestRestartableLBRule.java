@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,7 +22,7 @@ import java.util.Iterator;
 
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-import org.apache.jena.graph.Factory;
+import org.apache.jena.graph.GraphMemFactory;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.TransactionHandler;
 import org.apache.jena.graph.Triple;
@@ -107,7 +107,7 @@ public class TestRestartableLBRule extends TestCase {
 
     class DummyTxnGraph extends GraphBase implements Graph {
         TransactionHandler th = new DummyTxnHandler();
-        Graph base = Factory.createGraphMem();
+        Graph base = GraphMemFactory.createGraphMem();
 
         @Override
         public void performAdd( Triple t ) { base.add(t); }

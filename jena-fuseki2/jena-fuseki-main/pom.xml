@@ -25,7 +25,7 @@
   <parent>
     <groupId>org.apache.jena</groupId>
     <artifactId>jena-fuseki</artifactId>
-    <version>4.8.0-SNAPSHOT</version>
+    <version>5.4.0-SNAPSHOT</version>
   </parent> 
 
   <packaging>jar</packaging>
@@ -39,13 +39,13 @@
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-fuseki-core</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-fuseki-core</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
       <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
@@ -53,50 +53,126 @@
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-fuseki-access</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-cmds</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>${project.version}</version>
     </dependency>
 
+    <!-- Add for runtime in jena-fuseki-server -->
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>jena-fuseki-ui</artifactId>
+      <version>5.4.0-SNAPSHOT</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Add in jena-fuseki-server
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>jena-text</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    -->
+
+    <dependency>
+      <groupId>org.eclipse.jetty.ee10</groupId>
+      <artifactId>jetty-ee10-servlet</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jetty.ee10</groupId>
+      <artifactId>jetty-ee10-servlets</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-security</artifactId>
+    </dependency>
+    
     <!-- For parsing Jetty configuration files -->
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-xml</artifactId>
     </dependency>
 
+    <!-- Apache Shiro -->
     <dependency>
+      <groupId>org.apache.shiro</groupId>
+      <artifactId>shiro-core</artifactId>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.apache.shiro</groupId>
+      <artifactId>shiro-web</artifactId>
+      <classifier>jakarta</classifier>
+    </dependency>
+    
+    <!-- Testing -->
+    <dependency>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>test</scope>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+<!-- 
+   Only needed if the Junit5 artifacts don't pick the right runner
+   <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <version>${ver.junit}</version>
+      <scope>test</scope>
+    </dependency>
+-->    
+
+
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
       <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
+      <artifactId>log4j-slf4j2-impl</artifactId>
       <optional>true</optional>
       <scope>compile</scope>
     </dependency>
 
-    <!-- Include Shiro - for the example in src/test/java/ -->
-
+    <!-- Testing for custom functions only -->
     <dependency>
-      <groupId>org.apache.shiro</groupId>
-      <artifactId>shiro-core</artifactId>
+      <groupId>org.graalvm.js</groupId>
+      <artifactId>js-scriptengine</artifactId>
       <scope>test</scope>
-      <optional>true</optional>
     </dependency>
-
     <dependency>
-      <groupId>org.apache.shiro</groupId>
-      <artifactId>shiro-web</artifactId>
+      <groupId>org.graalvm.js</groupId>
+      <artifactId>js-community</artifactId>
       <scope>test</scope>
-      <optional>true</optional>
+      <type>pom</type>
     </dependency>
-
+    
   </dependencies>
 
   <build>

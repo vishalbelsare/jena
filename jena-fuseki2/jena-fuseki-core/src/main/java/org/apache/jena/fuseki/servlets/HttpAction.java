@@ -32,18 +32,20 @@ import java.util.Map;
 import java.util.zip.DeflaterInputStream;
 import java.util.zip.GZIPInputStream;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.jena.atlas.io.IO;
 import org.apache.jena.atlas.lib.NotImplemented;
 import org.apache.jena.atlas.logging.FmtLog;
 import org.apache.jena.atlas.logging.Log;
 import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.FusekiException;
+import org.apache.jena.fuseki.metrics.MetricsProvider;
 import org.apache.jena.fuseki.server.*;
 import org.apache.jena.fuseki.system.ActionCategory;
+import org.apache.jena.query.ReadWrite;
 import org.apache.jena.query.TxnType;
 import org.apache.jena.riot.WebContent;
 import org.apache.jena.riot.web.HttpNames;
@@ -147,7 +149,6 @@ public class HttpAction
      * @param dService {@link DataService}
      * @see Transactional
      */
-
     public void setRequest(DataAccessPoint dataAccessPoint, DataService dService) {
         if ( this.dataAccessPoint != null )
             throw new FusekiException("Redefinition of DataAccessPoint in the request action");
@@ -219,19 +220,20 @@ public class HttpAction
     /**
      * Return the "Transactional" for this HttpAction.
      */
-
     public Transactional getTransactional() {
         return transactional;
     }
 
-    /** This is the requestURI with the context path removed.
-     *  It should be used internally for dispatch.
+    /**
+     * This is the requestURI with the context path removed.
+     * It should be used internally for dispatch.
      */
     public String getActionURI() {
         return actionURI;
     }
 
-    /** Get the context path.
+    /**
+     * Get the context path.
      */
     public String getContextPath() {
         return contextPath;
@@ -251,7 +253,25 @@ public class HttpAction
         return dataAccessPointRegistry;
     }
 
-    /** Set the endpoint and endpoint name that this is an action for.
+    /**
+     * Get {@link ServletContext} (may be null).
+     */
+    public ServletContext getServletContext() {
+        return request.getServletContext();
+    }
+
+    /**
+     * Get the {@link MetricsProvider} for this action.
+     */
+    public MetricsProvider getMetricsProvider() {
+        ServletContext servletContext = getServletContext();
+        if ( servletContext == null )
+            return null;
+        return MetricsProvider.getMetricsProvider(servletContext);
+    }
+
+    /**
+     * Set the endpoint and endpoint name that this is an action for.
      * @param endpoint {@link Endpoint}
      */
     public void setEndpoint(Endpoint endpoint) {
@@ -272,82 +292,247 @@ public class HttpAction
         return isTransactional;
     }
 
+    public final void startRequest() {
+        if ( dataAccessPoint != null )
+            dataAccessPoint.startRequest(this);
+    }
+
+    public final void finishRequest() {
+        // Should be handled where necessary in the request handling.
+//      if ( inputStream != null ) {
+//          ActionLib.consumeBody(this);
+//      }
+//      if ( outputStream != null ) {
+//          IO.flush(outputStream);
+//          IO.close(outputStream);
+//      }
+        if ( dataAccessPoint != null )
+            dataAccessPoint.finishRequest(this);
+        if ( isInActionTxn )
+            FmtLog.error(log, "[%d] Action transaction not finished", this.id);
+    }
+
+    /**
+     * Begin a transaction of any {@link TxnType} - this should be paired with an {@link #end()}
+     *
+     * <pre>
+     *   httpAction.begin();
+     *   try {
+     *      work
+     *      possible promote to write
+     *      commit or abort (if write)
+     *      response
+     *   } finally { httpAction.end(); }
+     * </pre>
+     *
+     * Prefer one of {@link #beginRead()} or {@link #beginWrite()} if the action is
+     * known to be a a read or write at the start or call {@link #begin()}
+     * if the transaction may promote.
+     */
     public void begin(TxnType txnType) {
+        enterActionTxn();
         if ( transactional != null )
             transactional.begin(txnType);
         activeDSG = dsg;
         if ( dataService != null )
+            // Paired with finishTxn in end()
             dataService.startTxn(txnType);
+        startActionTxn();
     }
 
+    /**
+     * Begin a transaction - this should be paired with an {@link #end()}
+     * <pre>
+     *   httpAction.begin();
+     *   try {
+     *      work
+     *      possible promote to write
+     *      commit or abort (if write)
+     *      response
+     *   } finally { httpAction.end(); }
+     *   </pre>
+     */
     public void begin() {
         begin(READ_PROMOTE);
     }
 
+    /**
+     *  Begin a write operation - this should be paired with an {@link #endWrite()}
+     * <pre>
+     *   httpAction.beginWrite();
+     *   try {
+     *      work
+     *      commit or abort
+     *      response
+     *   } finally { httpAction.endWrite(); }
+     *   </pre>
+     */
     public void beginWrite() {
         begin(WRITE);
     }
 
+    /**
+     *  Begin a read operation - this should be paired with an {@link #endRead()}
+     * <pre>
+     *   httpAction.beginRead();
+     *   try {
+     *      work
+     *      response
+     *   } finally { httpAction.endRead(); }
+     *   </pre>
+     */
     public void beginRead() {
         begin(READ);
     }
 
+    /**
+     * End a read transaction - paired with {@link #beginRead}.
+     */
     public void endRead() {
+        endInternal();
+    }
+
+    /**
+     * End a write transaction - paired with {@link #beginWrite}.
+     */
+    public void endWrite() {
+        endInternal();
+    }
+
+    /**
+     * End a write transaction - paired with {@link #begin()} or {@link #begin(TxnType)}.
+     */
+    public void end() {
+        endInternal();
+    }
+
+    private void endInternal() {
+        // Commit or abort may have called end() already.
+        // Possibly multiple endWrite, endRead (not ideal, but not breaking)
+        if ( actionTxnEndCalled )
+            return;
+        actionTxnEndCalled = true;
+        finishActionTxn();
         if ( dataService != null )
             dataService.finishTxn();
         if ( transactional != null ) {
-            try { transactional.commit(); } catch (RuntimeException ex) {}
-            try { transactional.end(); } catch (RuntimeException ex) {}
-        }
-    }
-
-    public void end() {
-        dataService.finishTxn();
-        if ( transactional.isInTransaction() ) {
-            FmtLog.warn(log, "[%d] Transaction still active - no commit or abort seen (forced abort)", this.id);
-            try {
-                transactional.abort();
-            } catch (RuntimeException ex) {
-                FmtLog.warn(log, "[%d] Exception in forced abort (trying to continue)", this.id, ex);
-            }
-        }
-        if ( transactional.isInTransaction() ) {
+            if ( transactional.isInTransaction() )
+                completeTransactional();
+            // Perform end()
             try { transactional.end(); }
             catch (RuntimeException ex) {}
         }
-        endOfAction();
+        leaveActionTxn();
     }
 
-    private void endOfAction() {
-        activeDSG = null;
-        // Should be handled where necessary in the request handling.
-//        if ( inputStream != null ) {
-//            ActionLib.consumeBody(this);
-//        }
-//        if ( outputStream != null ) {
-//            IO.flush(outputStream);
-//            IO.close(outputStream);
-//        }
+    /**
+     * Complete the transactional:
+     * <ul>
+     * <li>Read - No additional action needed</li>
+     * <li>Write force an abort</li>
+     * <ul>
+     */
+    private void completeTransactional() {
+        ReadWrite rwMode = transactional.transactionMode();
+        if ( rwMode == null )
+            // Damaged system. Robustly ignore.
+            return;
+        switch(rwMode) {
+            case READ -> {/* begin-end is accepted for a read action : work done in  transactional.end() */}
+            case WRITE -> {
+                // Write transactions must have explicitly called commit or abort.
+                FmtLog.warn(log, "[%d] Transaction still active - no commit or abort seen (forced abort)", this.id);
+                try {
+                    transactional.abort();
+                } catch (RuntimeException ex) {
+                    FmtLog.warn(log, "[%d] Exception in forced abort (trying to continue)", this.id, ex);
+                }
+            }
+        }
     }
+
+    // An action begin-end is on the same thread.
+    // No concurrency issues for these variables.
+    private boolean isInActionTxn = false;
+    private int actionTxnCount = 0;
+    // Protect against nesting endInternal. This should not happen.
+    private boolean actionTxnEndCalled = false;
+
+    // begin :: enter then start
+    // end  ::  finish then leave
+
+    /**
+     * Called on entry to {@link #begin(TxnType)}; paired with {@link #leaveActionTxn}.
+     * {@code transaction.isInTransaction()} is false.
+     */
+    private void enterActionTxn() {
+        if ( isInActionTxn ) {
+            FmtLog.warn(log, "[%d] Already in an action", this.id);
+            ServletOps.errorOccurred("Internal error: bad action handling");
+        }
+        if ( actionTxnCount != 0 )
+            FmtLog.error(log, "[%d] Enter: actionTxnCount = %d", this.id, actionTxnCount);
+    }
+
+    /**
+     * Called on exit from {@link #end()}; paired with {@link #enterActionTxn}.
+     * {@code transaction.isInTransaction()} is false.
+     */
+    private void leaveActionTxn() {
+        if ( actionTxnCount != 0 )
+            FmtLog.error(log, "[%d] Leave: actionTxnCount = %d", this.id, actionTxnCount);
+        if ( isInActionTxn )
+            FmtLog.error(log, "[%d] Action transaction not end'ed.", this.id);
+    }
+
+    /**
+     * Called on leaving {@link #begin(TxnType)}; paired with {@link #leaveActionTxn}.
+     * {@code transaction.isInTransaction()} is true.
+     */
+    private void startActionTxn() {
+        isInActionTxn = true;
+        actionTxnCount++;
+        actionTxnEndCalled = false;
+    }
+
+    /**
+     * Called on exit from {@link #end()}; paired with {@link #startActionTxn}.
+     * {@code transaction.isInTransaction()} is false.
+     */
+    private void finishActionTxn() {
+        if ( ! isInActionTxn )
+            // Double end?
+            FmtLog.warn(log, "[%d] end called - Not in an action", this.id);
+        activeDSG = null;
+        isInActionTxn = false;
+        actionTxnCount--;
+    }
+
+    // ----
 
     public void commit() {
-        dataService.finishTxn();
-        transactional.commit();
-        end();
+//dataService.finishTxn();
+        if ( transactional != null )
+            transactional.commit();
+        endInternal();
     }
 
     /** Abort: ignore exceptions (for clearup code) */
     public void abortSilent() {
-        try { transactional.abort(); }
-        catch (Exception ex) {}
-        finally {
-            try { end(); } catch (Exception ex) {}
+        try {
+            if ( transactional != null )
+                transactional.abort();
+        } catch (Exception ex) {
+        } finally {
+            try { endInternal(); } catch (Exception ex) {}
         }
     }
 
     public void abort() {
-        try { transactional.abort(); }
-        catch (Exception ex) {
+        try {
+            if ( transactional != null )
+                transactional.abort();
+        } catch (Exception ex) {
             // Some datasets claim to be transactional but
             // don't provide a real abort. We tried to avoid
             // them earlier but even if they sneak through,
@@ -355,16 +540,6 @@ public class HttpAction
             Log.warn(this, "Exception during abort (operation attempts to continue): "+ex.getMessage());
         }
         end();
-    }
-
-    public final void startRequest() {
-        if ( dataAccessPoint != null )
-            dataAccessPoint.startRequest(this);
-    }
-
-    public final void finishRequest() {
-        if ( dataAccessPoint != null )
-            dataAccessPoint.finishRequest(this);
     }
 
     /** If inside the transaction for the action, return the active {@link DatasetGraph},
@@ -399,7 +574,8 @@ public class HttpAction
 //        this.datasetName = datasetName;
 //    }
 
-    /** Reduce to a size that can be kept around for sometime.
+    /**
+     * Reduce to a size that can be kept around for sometime.
      */
     public void minimize() {
         this.request = null;
@@ -461,6 +637,8 @@ public class HttpAction
 
     // ---- Request - response abstraction.
 
+    /** @deprecated Use {@link #getRequestMethod}. */
+    @Deprecated(since="5.1.0", forRemoval=true)
     public String getMethod()                           { return request.getMethod(); }
 
     public HttpServletRequest getRequest()              { return request; }
@@ -524,10 +702,10 @@ public class HttpAction
         return inputStream;
     }
 
-    /** Get the request input stream, bypassing any compression.
+    /**
+     * Get the request input stream, bypassing any compression.
      * The state of the input stream is unknown.
      * Only useful for skipping a body on a connection.
-     * @throws IOException
      */
     public InputStream getRequestInputStreamRaw() throws IOException {
         return request.getInputStream();
@@ -541,8 +719,8 @@ public class HttpAction
         return request.getRequestURI();
     }
 
-    public StringBuffer getRequestRequestURL() {
-        return request.getRequestURL();
+    public String getRequestRequestURL() {
+        return request.getRequestURL().toString();
     }
 
     public String getRequestPathInfo() {
@@ -646,20 +824,12 @@ public class HttpAction
         String encoding = action.request.getHeader(HttpNames.hContentEncoding);
         if ( encoding == null )
             return input;
-        switch (encoding) {
-            case WebContent.encodingGzip :
-                return new GZIPInputStream(input, 8192);
-            case WebContent.encodingDeflate :
-                return new DeflaterInputStream(input);
-                // Not supported:
-            case "br" :
-                // From Apache Common Compress but needs extra org.brotli.dec.BrotliInputStream
-            case "compress" :
-                // Legacy - not supported
-            default :
-        }
-        // Not supported or not understood.
-        ServletOps.error(HttpSC.BAD_REQUEST_400, HttpNames.hContentEncoding+" '"+encoding+"' encoding not supported");
-        return null;
+        return switch (encoding) {
+            case WebContent.encodingGzip -> new GZIPInputStream(input, 8192);
+            case WebContent.encodingDeflate -> new DeflaterInputStream(input);
+//            case "br" :
+//            case "compress" :
+            default-> { ServletOps.error(HttpSC.BAD_REQUEST_400, HttpNames.hContentEncoding+" '"+encoding+"' encoding not supported");  yield null; }
+        };
     }
 }

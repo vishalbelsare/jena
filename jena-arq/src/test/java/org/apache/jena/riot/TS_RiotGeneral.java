@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,7 +18,6 @@
 
 package org.apache.jena.riot;
 
-import org.apache.jena.riot.writer.TestJsonLD10Writer;
 import org.junit.runner.RunWith ;
 import org.junit.runners.Suite ;
 import org.junit.runners.Suite.SuiteClasses ;
@@ -32,17 +31,15 @@ import org.junit.runners.Suite.SuiteClasses ;
     , TestJenaReaderRIOT.class
     , TestReadData.class
     , TestRiotReader.class
-    , TestRDFParser.class
     , TestParserRegistry.class
-    , TestRDFWriter.class
     , TestRDFParser.class
+    , TestRDFWriter.class
     , TestParseURISchemeBases.class
 
-    , TestTurtleWriter.class
+    , TestTurtleTrigWriter.class
     , TestTurtleWriterPretty.class
 
     , TestJsonLDReader.class
-    , TestJsonLD10Writer.class
 })
 
 public class TS_RiotGeneral

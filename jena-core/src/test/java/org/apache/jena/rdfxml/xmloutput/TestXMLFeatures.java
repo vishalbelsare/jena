@@ -19,6 +19,7 @@
 package org.apache.jena.rdfxml.xmloutput;
 
 import java.io.* ;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection ;
 import java.util.HashSet ;
 import java.util.Iterator ;
@@ -33,8 +34,7 @@ import org.apache.jena.rdf.model.RDFReaderI ;
 import org.apache.jena.rdf.model.RDFWriterI ;
 import org.apache.jena.rdf.model.impl.RDFDefaultErrorHandler ;
 import org.apache.jena.rdf.model.impl.Util ;
-import org.apache.jena.rdf.model.test.ModelTestBase ;
-import org.apache.jena.rdfxml.xmlinput.RDFXMLReader;
+import org.apache.jena.rdfxml.xmlinput1.RDFXMLReader;
 import org.apache.jena.rdfxml.xmloutput.impl.BaseXMLWriter ;
 import org.apache.jena.rdfxml.xmloutput.impl.SimpleLogger ;
 import org.apache.jena.shared.InvalidPropertyURIException ;
@@ -60,49 +60,9 @@ public class TestXMLFeatures extends XMLOutputTestBase {
 		return getName() + " " + lang;
 	}
 
-	public void SUPPRESSEDtestRelativeURI() {
-		Model m = ModelFactory.createDefaultModel();
-		m.createResource("foo").addProperty(RDF.value, "bar");
-		m.write(new OutputStream() {
-			@Override
-            public void write(int b) {
-			}
-		}, lang);
-	}
-
-	public void SUPPRESStestNoStripes() throws IOException {
-		check("testing/abbreviated/collection.rdf",
-				"                              <[a-zA-Z][-a-zA-Z0-9._]*:Class",
-				Change.blockRules("resourcePropertyElt"),
-				"http://example.org/foo");
-	}
-
-	/**
-	 * Very specific test case to trap bug whereby a model which has a prefix
-	 * j.0 defined (eg it was read in from a model we wrote out earlier) wants
-	 * to allocate a new j.* prefix and picked j.0, BOOM.
-	 */
-	public void SUPPRESSEDtestBrokenPrefixing() {
-		Model m = ModelFactory.createDefaultModel();
-		m.add(ModelTestBase.statement(m, "a http://bingle.bongle/booty#PP b"));
-		m.add(ModelTestBase.statement(m, "c http://dingle.dongle/dooty#PP d"));
-		StringWriter sw = new StringWriter();
-		m.write(sw);
-		Model m2 = ModelFactory.createDefaultModel();
-		String written = sw.toString();
-		m2.read(new StringReader(written), "");
-		StringWriter sw2 = new StringWriter();
-		m2.write(sw2);
-		String s2 = sw2.toString();
-		int first = s2.indexOf("xmlns:j.0=");
-		int last = s2.lastIndexOf("xmlns:j.0=");
-		assertEquals(first, last);
-		System.out.println(sw2.toString());
-	}
-
 	/**
 	 * Writing a model with the base URI set to null should not throw a
-	 * nullpointer exception.
+	 * null pointer exception.
 	 */
 	public void testNullBaseWithAbbrev() {
 		ModelFactory.createDefaultModel().write(new StringWriter(), lang, null);
@@ -421,7 +381,7 @@ public class TestXMLFeatures extends XMLOutputTestBase {
         blockLogger() ;
         Node blank = NodeFactory.createBlankNode() ;
         Node prop = NodeFactory.createURI(s) ;
-        Graph g = Factory.createGraphMem() ;
+        Graph g = GraphMemFactory.createGraphMem() ;
         g.add(Triple.create(blank, prop, blank)) ;
         // create Model
         Model m = ModelFactory.createModelForGraph(g) ;
@@ -544,7 +504,7 @@ public class TestXMLFeatures extends XMLOutputTestBase {
 		    RDFWriterI writer = m.getWriter(lang);
 		    writer.setProperty("relativeURIs", relativeParam);
 		    writer.write(m, bos, base);
-	        contents = bos.toString("UTF8");
+	        contents = bos.toString(StandardCharsets.UTF_8);
 		}
 
 		try {

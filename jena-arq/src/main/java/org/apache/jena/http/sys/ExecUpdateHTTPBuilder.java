@@ -20,18 +20,19 @@ package org.apache.jena.http.sys;
 
 import java.net.http.HttpClient;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
-import org.apache.jena.atlas.lib.InternalErrorException;
 import org.apache.jena.graph.Node;
 import org.apache.jena.http.HttpEnv;
 import org.apache.jena.query.ARQ;
-import org.apache.jena.query.QueryException;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.exec.http.Params;
 import org.apache.jena.sparql.exec.http.UpdateSendMode;
 import org.apache.jena.sparql.syntax.syntaxtransform.UpdateTransformOps;
 import org.apache.jena.sparql.util.Context;
+import org.apache.jena.sparql.util.ContextAccumulator;
 import org.apache.jena.sparql.util.Symbol;
 import org.apache.jena.sys.JenaSystem;
 import org.apache.jena.update.Update;
@@ -41,11 +42,107 @@ import org.apache.jena.update.UpdateRequest;
 
 public abstract class ExecUpdateHTTPBuilder<X, Y> {
 
+    /** Update element. Either an Update object or a string. */
+    private record UpdateElt(Update update, String updateString) {
+        UpdateElt(Update update) { this(Objects.requireNonNull(update), null); }
+        UpdateElt(String updateString) { this(null, Objects.requireNonNull(updateString)); }
+        boolean isParsed() { return update != null; }
+
+        @Override
+        public String toString() {
+            return isParsed()
+                    ? new UpdateRequest(update()).toString() // Reuse UpdateRequest's serialization approach
+                    : updateString();
+        }
+    }
+
+    /** Accumulator for update elements. Can build an overall string or UpdateRequest from the elements. */
+    private class UpdateEltAcc implements Iterable<UpdateElt> {
+        /** Delimiter for joining multiple SPARQL update strings into a single one.
+          * The delimiter takes into account that the last line of a statement may be a single-line-comment. */
+        public static final String DELIMITER = "\n;\n";
+
+        private List<UpdateElt> updateOperations = new ArrayList<>();
+        private List<UpdateElt> updateOperationsView = Collections.unmodifiableList(updateOperations);
+        private boolean isParsed = true; // True iff there are no strings in updateOperations
+
+        public boolean isParsed() {
+            return isParsed;
+        }
+
+        public void add(UpdateElt updateElt) {
+            isParsed = isParsed && updateElt.isParsed();
+            updateOperations.add(updateElt);
+        }
+
+        public void add(Update update) {
+            add(new UpdateElt(update));
+        }
+
+        /** Add a string by parsing it. */
+        public void add(String updateRequestString) {
+            UpdateRequest updateRequest = UpdateFactory.create(updateRequestString);
+            add(updateRequest);
+        }
+
+        public void add(UpdateRequest updateRequest) {
+            updateRequest.getOperations().forEach(this::add);
+        }
+
+        /** Add a string without parsing it. */
+        public void addString(String updateRequestString) {
+            add(new UpdateElt(updateRequestString));
+        }
+
+        /** Attempt to build an UpdateRequest from the state of this accumulator. Attempts to parse any string elements. */
+        public UpdateRequest buildUpdateRequest() {
+            return addToUpdateRequest(new UpdateRequest());
+        }
+
+        public UpdateRequest addToUpdateRequest(UpdateRequest updateRequest) {
+            for (UpdateElt elt : updateOperations) {
+                if (elt.isParsed()) {
+                    updateRequest.add(elt.update());
+                } else {
+                    try {
+                        updateRequest.add(elt.updateString());
+                    } catch (Exception e) {
+                        // Expose the string that failed to parse
+                        e.addSuppressed(new RuntimeException("Failed to parse: " + elt.updateString()));
+                        throw e;
+                    }
+                }
+            }
+            return updateRequest;
+        }
+
+        public void clear() {
+            updateOperations.clear();
+            isParsed = true;
+        }
+
+        public boolean isEmpty() {
+            return updateOperations.isEmpty();
+        }
+
+        @Override
+        public Iterator<UpdateElt> iterator() {
+            return updateOperationsView.iterator();
+        }
+
+        public String buildString() {
+            return updateOperations.stream()
+                .map(UpdateElt::toString)
+                .collect(Collectors.joining(DELIMITER));
+        }
+    }
+
     static { JenaSystem.init(); }
 
     protected String serviceURL;
-    protected String updateString;
-    private UpdateRequest updateOperations = null;
+    protected boolean parseCheck = true;
+    private UpdateEltAcc updateEltAcc = new UpdateEltAcc();
+
     protected Params params = Params.create();
     protected boolean allowCompression;
     protected Map<String, String> httpHeaders = new HashMap<>();
@@ -53,9 +150,11 @@ public abstract class ExecUpdateHTTPBuilder<X, Y> {
     protected UpdateSendMode sendMode = UpdateSendMode.systemDefault;
     protected List<String> usingGraphURIs = null;
     protected List<String> usingNamedGraphURIs = null;
-    protected Context context = null;
+    private ContextAccumulator contextAcc = ContextAccumulator.newBuilder(()->ARQ.getContext());
     // Uses query rewrite to replace variables by values.
     protected Map<Var, Node> substitutionMap     = new HashMap<>();
+    protected long timeout = -1;
+    protected TimeUnit timeoutUnit = null;
 
     protected ExecUpdateHTTPBuilder() {}
 
@@ -68,26 +167,24 @@ public abstract class ExecUpdateHTTPBuilder<X, Y> {
 
     public Y update(UpdateRequest updateRequest) {
         Objects.requireNonNull(updateRequest);
-        ensureUpdateRequest();
-        updateRequest.getOperations().forEach(this::update);
-        this.updateString = null;
+        updateEltAcc.add(updateRequest);
         return thisBuilder();
     }
 
     public Y update(String updateRequestString) {
-        ensureUpdateRequest();
-        UpdateRequest more = UpdateFactory.create(updateRequestString);
-        more.getOperations().forEach(this::update);
-        this.updateString = null;
+        Objects.requireNonNull(updateRequestString);
+        if (parseCheck) {
+            updateEltAcc.add(updateRequestString);
+        } else {
+            updateEltAcc.addString(updateRequestString);
+        }
         return thisBuilder();
     }
 
     /** Add the update. */
     public Y update(Update update) {
         Objects.requireNonNull(update);
-        ensureUpdateRequest();
-        this.updateOperations.add(update);
-        this.updateString = null;
+        updateEltAcc.add(update);
         return thisBuilder();
     }
 
@@ -98,8 +195,13 @@ public abstract class ExecUpdateHTTPBuilder<X, Y> {
      */
     public Y updateString(String updateString) {
         Objects.requireNonNull(updateString);
-        this.updateOperations = null;
-        this.updateString = updateString;
+        updateEltAcc.clear();
+        updateEltAcc.addString(updateString);
+        return thisBuilder();
+    }
+
+    public Y parseCheck(boolean parseCheck) {
+        this.parseCheck = parseCheck;
         return thisBuilder();
     }
 
@@ -114,6 +216,12 @@ public abstract class ExecUpdateHTTPBuilder<X, Y> {
 
     public Y substitution(Var var, Node value) {
         this.substitutionMap.put(var, value);
+        return thisBuilder();
+    }
+
+    public Y timeout(long timeout, TimeUnit timeoutUnit) {
+        this.timeout = timeout;
+        this.timeoutUnit = timeoutUnit;
         return thisBuilder();
     }
 
@@ -178,50 +286,49 @@ public abstract class ExecUpdateHTTPBuilder<X, Y> {
     public Y context(Context context) {
         if ( context == null )
             return thisBuilder();
-        ensureContext();
-        this.context.putAll(context);
+        this.contextAcc.context(context);
         return thisBuilder();
     }
 
     public Y set(Symbol symbol, Object value) {
-        ensureContext();
-        this.context.put(symbol, value);
+        this.contextAcc.set(symbol, value);
         return thisBuilder();
     }
 
     public Y set(Symbol symbol, boolean value) {
-        ensureContext();
-        this.context.put(symbol, value);
+        this.contextAcc.set(symbol, value);
         return thisBuilder();
-    }
-
-    private void ensureContext() {
-        if ( context == null )
-            context = new Context();
-    }
-
-    private void ensureUpdateRequest() {
-        if ( updateOperations == null )
-            updateOperations = new UpdateRequest();
     }
 
     public X build() {
         Objects.requireNonNull(serviceURL, "No service URL");
-        if ( updateOperations == null && updateString == null )
-            throw new QueryException("No update for UpdateExecutionHTTP");
-        if ( updateOperations != null && updateString != null )
-            throw new InternalErrorException("UpdateRequest and update string");
+        if ( updateEltAcc.isEmpty() )
+            throw new UpdateException("No update for UpdateExecutionHTTP");
+
         HttpClient hClient = HttpEnv.getHttpClient(serviceURL, httpClient);
 
-        UpdateRequest updateActual = updateOperations;
+        // If all elements are objects then immediately build the UpdateRequest.
+        UpdateRequest updateActual = updateEltAcc.isParsed() ? updateEltAcc.buildUpdateRequest() : null;
+
         if ( substitutionMap != null && ! substitutionMap.isEmpty() ) {
-            if ( updateActual == null )
-                throw new UpdateException("Substitution only supported if an UpdateRequest object was provided");
+            // If updateActual is null it means that some elements are strings
+            // and we need to parse those now.
+            if ( updateActual == null ) {
+                try {
+                    updateActual = updateEltAcc.buildUpdateRequest();
+                } catch (Exception e) {
+                    throw new UpdateException("Substitution only supported for UpdateRequest objects. Failed to parse a given string as an UpdateRequest object.", e);
+                }
+            }
             updateActual = UpdateTransformOps.transform(updateActual, substitutionMap);
         }
-        Context cxt = (context!=null) ? context : ARQ.getContext().copy();
-        return buildX(hClient, updateActual, cxt);
+
+        // If the UpdateRequest object wasn't built until now then build the string instead.
+        String updateStringActual = updateActual == null ? updateEltAcc.buildString() : null;
+
+        Context cxt = contextAcc.context();
+        return buildX(hClient, updateActual, updateStringActual, cxt);
     }
 
-    protected abstract X buildX(HttpClient hClient, UpdateRequest updateActual, Context cxt);
+    protected abstract X buildX(HttpClient hClient, UpdateRequest updateActual, String updateStringActual, Context cxt);
 }

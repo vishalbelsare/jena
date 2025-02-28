@@ -22,7 +22,6 @@ import static java.lang.String.format;
 
 import java.util.*;
 
-import org.apache.jena.atlas.lib.DateTimeUtils;
 import org.apache.jena.atlas.logging.FmtLog;
 import org.apache.jena.fuseki.Fuseki;
 import org.slf4j.Logger;
@@ -33,23 +32,11 @@ public class FusekiCoreInfo {
     /** Details of the code version. */
     public static void logCode(Logger log) {
         String version = Fuseki.VERSION;
-        String buildDate = Fuseki.BUILD_DATE;
         String serverName = Fuseki.NAME;
-
-        if ( version != null && version.equals("${project.version}") )
-            version = null;
-        if ( buildDate != null && buildDate.equals("${build.time.xsd}") )
-            buildDate = DateTimeUtils.nowAsXSDDateTimeString();
-        if ( version != null ) {
-            if ( Fuseki.developmentMode && buildDate != null )
-                FmtLog.info(log, "%s %s %s", serverName, version, buildDate);
-            else
-                FmtLog.info(log, "%s %s", serverName, version);
-        }
+        FmtLog.info(log, "%s %s", serverName, version);
     }
 
     /** Log details - this function is about command line details */
-    // Shared between FusekiMain and Fuseki Webapp (currently).
     public static void logServerCmdSetup(Logger log, boolean verbose, DataAccessPointRegistry dapRegistry,
                                          String datasetPath, String datasetDescription, String serverConfigFile, String staticFiles) {
         if ( datasetPath != null )
@@ -58,16 +45,11 @@ public class FusekiCoreInfo {
             FmtLog.info(log, "Configuration file: %s", serverConfigFile);
 
         FusekiCoreInfo.logDataAccessPointRegistry(log, dapRegistry, verbose);
-
         if ( staticFiles != null )
             FmtLog.info(log, "Static files: %s", staticFiles);
-
-        if ( verbose ) {
-            PlatformInfo.logDetailsSystem(log);
+        PlatformInfo.logDetailsSystem(log);
+        if ( verbose )
             PlatformInfo.logDetailsJVM(log);
-        }
-        else
-            PlatformInfo.logDetailsSystemPlain(log);
     }
 
     /** Log a {@link DataAccessPointRegistry} */

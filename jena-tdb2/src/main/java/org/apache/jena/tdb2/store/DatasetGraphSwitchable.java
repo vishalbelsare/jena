@@ -41,7 +41,7 @@ public class DatasetGraphSwitchable extends DatasetGraphTxnCtl
     private final PrefixMapSwitchable prefixes;
 
     public DatasetGraphSwitchable(Path base, Location location, DatasetGraph dsg) {
-        // Don't use the slot in datasetGraphWrapper - use the AtomicReference
+        // Don't use the slot in DatasetGraphWrapper - use the AtomicReference
         super(null, dsg.getContext());
         dsgx.set(dsg);
         this.basePath = base;
@@ -50,7 +50,7 @@ public class DatasetGraphSwitchable extends DatasetGraphTxnCtl
     }
 
     /**
-     * The dataset to use for redirection - can be overridden.
+     * The dataset to use for redirection - this can be overridden.
      * It is also guaranteed that this is called only once per
      * delegated call.  Changes to the wrapped object can be
      * made based on that contract.
@@ -118,6 +118,6 @@ public class DatasetGraphSwitchable extends DatasetGraphTxnCtl
     @Override
     public Graph getGraph(Node gn) {
         Node key = ( gn != null ) ? gn : Quad.defaultGraphNodeGenerated;
-        return ngCache.getOrFill(key, ()->GraphViewSwitchable.createNamedGraphSwitchable(this, key));
+        return ngCache.get(key, (k)->GraphViewSwitchable.createNamedGraphSwitchable(this, k));
     }
 }

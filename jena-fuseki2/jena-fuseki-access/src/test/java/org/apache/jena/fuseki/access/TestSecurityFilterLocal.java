@@ -25,35 +25,30 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+
 import org.apache.jena.atlas.iterator.Iter;
 import org.apache.jena.atlas.lib.Creator;
 import org.apache.jena.atlas.lib.SetUtils;
 import org.apache.jena.atlas.lib.StrUtils;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.Node;
-import org.apache.jena.query.Dataset;
-import org.apache.jena.query.DatasetFactory;
-import org.apache.jena.query.QueryExecution;
-import org.apache.jena.query.QueryExecutionFactory;
-import org.apache.jena.query.QuerySolution;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFParser;
 import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sparql.core.DatasetGraphFactory;
 import org.apache.jena.sparql.core.Quad;
+import org.apache.jena.sparql.engine.binding.Binding;
+import org.apache.jena.sparql.exec.QueryExec;
 import org.apache.jena.sparql.sse.SSE;
 import org.apache.jena.system.Txn;
-import org.apache.jena.tdb.TDB;
-import org.apache.jena.tdb.TDBFactory;
+import org.apache.jena.tdb1.TDB1;
+import org.apache.jena.tdb1.TDB1Factory;
 import org.apache.jena.tdb2.DatabaseMgr;
 import org.apache.jena.tdb2.TDB2;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
 /** Test a controlled Dataset with access by TDB filter or general DatasetGraphFiltered. */
 @RunWith(Parameterized.class)
@@ -61,7 +56,7 @@ public class TestSecurityFilterLocal {
     @Parameters(name = "{index}: {0}")
     public static Iterable<Object[]> data() {
         // By filtering on the TDB database
-        Creator<DatasetGraph> c1 = TDBFactory::createDatasetGraph;
+        Creator<DatasetGraph> c1 = TDB1Factory::createDatasetGraph;
         Creator<DatasetGraph> c2 = DatabaseMgr::createDatasetGraph;
         Creator<DatasetGraph> c3 = DatasetGraphFactory::createTxnMem;
         Creator<DatasetGraph> c4 = DatasetGraphFactory::create;
@@ -117,26 +112,19 @@ public class TestSecurityFilterLocal {
         final DatasetGraph dsg1 = applyFilterDSG
             ? DataAccessCtl.filteredDataset(dsg, sCxt)
             : dsg;
-        Dataset ds = DatasetFactory.wrap(dsg1);
         return
-            Txn.calculateRead(ds, ()->{
-                try(QueryExecution qExec = QueryExecutionFactory.create(queryString, ds)) {
-//                    if ( applyFilterTDB && ! sCxt.equals(SecurityContext.NONE)) {
-//                        ((SecurityContextView)sCxt).filterTDB(dsg1, qExec);
-//                    }
+            Txn.calculateRead(dsg1, ()->{
+                try(QueryExec qExec = QueryExec.dataset(dsg1).query(queryString).build()) {
                     if ( applyFilterTDB )
                         sCxt.filterTDB(dsg1, qExec);
-                    List<QuerySolution> results = Iter.toList(qExec.execSelect());
-                    Stream<Node> stream = results.stream()
-                        .map(qs->qs.get("s"))
-                        .filter(Objects::nonNull)
-                        .map(RDFNode::asNode);
+                    List<Binding> results = Iter.toList(qExec.select());
+                    Stream<Node> stream = results.stream().map(qs -> qs.get("s")).filter(Objects::nonNull);
                     return SetUtils.toSet(stream);
                 }
             });
     }
 
-    private Set<Node> subjects(DatasetGraph dsg,  Function<DatasetGraph, Graph> graphChoice, String queryString, SecurityContext sCxt) {
+    private Set<Node> subjects(DatasetGraph dsg, Function<DatasetGraph, Graph> graphChoice, String queryString, SecurityContext sCxt) {
         final DatasetGraph dsg1 = applyFilterDSG
             ? DataAccessCtl.filteredDataset(dsg, sCxt)
             : dsg;
@@ -144,14 +132,13 @@ public class TestSecurityFilterLocal {
         if ( graph == null )
             // Can't see the graph.
             return Collections.emptySet();
-        Model model = ModelFactory.createModelForGraph(graph);
         return
             Txn.calculateRead(testdsg, ()->{
-                try(QueryExecution qExec = QueryExecutionFactory.create(queryString, model)) {
+                try(QueryExec qExec = QueryExec.graph(graph).query(queryString).build()) {
                     if ( applyFilterTDB )
                         sCxt.filterTDB(dsg1, qExec);
-                    List<QuerySolution> results = Iter.toList(qExec.execSelect());
-                    Stream<Node> stream = results.stream().map(qs->qs.get("s")).filter(Objects::nonNull).map(RDFNode::asNode);
+                    List<Binding> results = Iter.toList(qExec.select());
+                    Stream<Node> stream = results.stream().map(qs->qs.get("s")).filter(Objects::nonNull);
                     return SetUtils.toSet(stream);
                 }
             });
@@ -162,14 +149,13 @@ public class TestSecurityFilterLocal {
         final DatasetGraph dsg1 = applyFilterDSG
             ? DataAccessCtl.filteredDataset(dsg, sCxt)
             : dsg;
-        Dataset ds = DatasetFactory.wrap(dsg1);
         return
-            Txn.calculateRead(ds, ()->{
-                try(QueryExecution qExec = QueryExecutionFactory.create(queryGraphNames, ds)) {
+            Txn.calculateRead(dsg1, ()->{
+                try(QueryExec qExec = QueryExec.dataset(dsg1).query(queryGraphNames).build()) {
                     if ( applyFilterTDB )
                         sCxt.filterTDB(dsg1, qExec);
-                    List<QuerySolution> results = Iter.toList(qExec.execSelect());
-                    Stream<Node> stream = results.stream().map(qs->qs.get("g")).filter(Objects::nonNull).map(RDFNode::asNode);
+                    List<Binding> results = Iter.toList(qExec.select());
+                    Stream<Node> stream = results.stream().map(qs->qs.get("g")).filter(Objects::nonNull);
                     return SetUtils.toSet(stream);
                 }
             });
@@ -181,7 +167,7 @@ public class TestSecurityFilterLocal {
         assertSeen(visible);
     }
 
-    // QueryExecution
+    // Query execution
     private void filter_user(String user, Node ... expected) {
         SecurityContext sCxt = reg.get(user);
         Set<Node> visible = subjects(testdsg, queryAll, sCxt);
@@ -255,19 +241,19 @@ public class TestSecurityFilterLocal {
         assertSeen(visible);
     }
 
-    // QueryExecution w/ Union default graph
+    // Query execution w/ union default graph
     private void filter_union_user(String user, Node ... expected) {
         SecurityContext sCxt = reg.get(user);
         Set<Node> visible;
         if ( applyFilterTDB ) {
             // TDB special version. Set the TDB flags for union default graph
             try {
-                testdsg.getContext().set(TDB.symUnionDefaultGraph, true);
+                testdsg.getContext().set(TDB1.symUnionDefaultGraph, true);
                 testdsg.getContext().set(TDB2.symUnionDefaultGraph, true);
                 visible = subjects(testdsg, queryDft, sCxt);
             } finally {
                 // And unset them.
-                testdsg.getContext().unset(TDB.symUnionDefaultGraph);
+                testdsg.getContext().unset(TDB1.symUnionDefaultGraph);
                 testdsg.getContext().unset(TDB2.symUnionDefaultGraph);
             }
         } else {
@@ -303,56 +289,56 @@ public class TestSecurityFilterLocal {
     }
 
 
-    // Graph/Model
-    @Test public void query_model_userNone() {
-        query_model_user(testdsg, dsg->dsg.getDefaultGraph(), "userNone");
+    // Graph
+    @Test public void query_graph_userNone() {
+        query_graph_user(testdsg, dsg->dsg.getDefaultGraph(), "userNone");
     }
 
-    @Test public void query_model_userDft() {
-        query_model_user(testdsg, dsg->dsg.getDefaultGraph(), "userDft", s0);
+    @Test public void query_graph_userDft() {
+        query_graph_user(testdsg, dsg->dsg.getDefaultGraph(), "userDft", s0);
     }
 
-    @Test public void query_model_user0() {
-        query_model_user(testdsg, dsg->dsg.getDefaultGraph(), "user0", s0);
+    @Test public void query_graph_user0() {
+        query_graph_user(testdsg, dsg->dsg.getDefaultGraph(), "user0", s0);
     }
 
-    @Test public void query_model_user1() {
-        query_model_user(testdsg, dsg->dsg.getDefaultGraph(), "user1", s0);
+    @Test public void query_graph_user1() {
+        query_graph_user(testdsg, dsg->dsg.getDefaultGraph(), "user1", s0);
     }
 
-    @Test public void query_model_user2() {
-        query_model_user(testdsg, dsg->dsg.getDefaultGraph(), "user2");
+    @Test public void query_graph_user2() {
+        query_graph_user(testdsg, dsg->dsg.getDefaultGraph(), "user2");
     }
 
-    @Test public void query_model_ng_userNone() {
-        query_model_user(testdsg, dsg->dsg.getGraph(g1), "userNone");
+    @Test public void query_graph_ng_userNone() {
+        query_graph_user(testdsg, dsg->dsg.getGraph(g1), "userNone");
     }
 
-    @Test public void query_model_ng_user11() {
-        query_model_user(testdsg, dsg->dsg.getGraph(g1), "user1", s1);
+    @Test public void query_graph_ng_user11() {
+        query_graph_user(testdsg, dsg->dsg.getGraph(g1), "user1", s1);
     }
 
-    @Test public void query_model_ng_user21() {
-        query_model_user(testdsg, dsg->dsg.getGraph(g1), "user2", s1);
+    @Test public void query_graph_ng_user21() {
+        query_graph_user(testdsg, dsg->dsg.getGraph(g1), "user2", s1);
     }
 
-    @Test public void query_model_ng_user12() {
-        query_model_user(testdsg, dsg->dsg.getGraph(g2), "user1");
+    @Test public void query_graph_ng_user12() {
+        query_graph_user(testdsg, dsg->dsg.getGraph(g2), "user1");
     }
 
-    @Test public void query_model_ng_user22() {
-        query_model_user(testdsg, dsg->dsg.getGraph(g2), "user2", s2);
+    @Test public void query_graph_ng_user22() {
+        query_graph_user(testdsg, dsg->dsg.getGraph(g2), "user2", s2);
     }
 
-    @Test public void query_model_userXa() {
-        query_model_user(testdsg, dsg->dsg.getDefaultGraph(), "userX");
+    @Test public void query_graph_userXa() {
+        query_graph_user(testdsg, dsg->dsg.getDefaultGraph(), "userX");
     }
 
-    @Test public void query_model_userXb() {
-        query_model_user(testdsg, dsg->dsg.getGraph(g1), "userX");
+    @Test public void query_graph_userXb() {
+        query_graph_user(testdsg, dsg->dsg.getGraph(g1), "userX");
     }
 
-    private void query_model_user(DatasetGraph dsg, Function<DatasetGraph, Graph> graphChoice, String user, Node ... expected) {
+    private void query_graph_user(DatasetGraph dsg, Function<DatasetGraph, Graph> graphChoice, String user, Node ... expected) {
         SecurityContext sCxt = reg.get(user);
         Set<Node> visible = subjects(dsg, graphChoice, queryDft, sCxt);
         assertSeen(visible, expected);

@@ -18,40 +18,41 @@
 
 package org.apache.jena.fuseki.main;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 
-public class AbstractFusekiTest extends BaseFusekiTest {
-    @BeforeClass public static void startServer() {
+import org.apache.jena.sparql.core.DatasetGraph;
+import org.apache.jena.sparql.core.DatasetGraphFactory;
 
-//      FusekiLogging.setLogging();
-//      LogCtl.enable(Fuseki.actionLog);
-//      LogCtl.enable(Fuseki.serverLog);
+/**
+ * Common setup for running a server with services and an initially empty database.
+ */
+public class AbstractFusekiTest {
+    private FusekiServer server;
 
-      server = FusekiServer.create()
-              .port(0)
-              //.verbose(true)
-              .add(datasetPath(), dsgTesting)
-              .enablePing(true)
-              .enableMetrics(true)
-              .build();
-      server.start();
-      port = server.getPort();
-      serverURL = "http://localhost:"+port+"/";
-  }
+    protected String datasetName()    { return "database"; }
+    protected String datasetPath()    { return "/"+datasetName(); }
+    protected String databaseURL()    { return server.datasetURL(datasetPath()); }
+    protected String serverURL()      { return server.serverURL(); }
 
-  @AfterClass public static void stopServer() {
-      try {
-          server.stop();
-      } catch (Throwable th) {
-          th.printStackTrace();
-      }
-  }
+    protected String serviceUpdate()  { return databaseURL()+"/update"; }
+    protected String serviceQuery()   { return databaseURL()+"/query"; }
+    protected String serviceGSP_R()   { return databaseURL()+"/get"; }
+    protected String serviceGSP()     { return databaseURL()+"/data"; }
 
+    @BeforeEach public void startServer() {
+        DatasetGraph dsgTesting = DatasetGraphFactory.createTxnMem();
+        server = FusekiServer.create()
+                .port(0)
+                //.verbose(true)
+                .add(datasetPath(), dsgTesting)
+                .enablePing(true)
+                .enableMetrics(true)
+                .start();
+    }
 
-  @Before public void beforeTest() { resetDatabase(); }
-  @After public void afterTest() {}
-
+    @AfterEach public void stopServer() {
+        if ( server != null )
+            server.stop();
+    }
 }

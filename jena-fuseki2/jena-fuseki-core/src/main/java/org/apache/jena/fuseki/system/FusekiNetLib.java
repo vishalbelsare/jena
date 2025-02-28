@@ -21,13 +21,10 @@ package org.apache.jena.fuseki.system;
 import java.util.Enumeration;
 import java.util.Iterator;
 
-import javax.servlet.http.HttpServletRequest;
-
+import jakarta.servlet.http.HttpServletRequest;
+import org.apache.commons.collections4.MultiMapUtils;
+import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.jena.atlas.web.ContentType;
-import org.apache.jena.atlas.web.WebLib;
-import org.apache.jena.ext.com.google.common.collect.ArrayListMultimap;
-import org.apache.jena.ext.com.google.common.collect.Multimap;
-import org.apache.jena.fuseki.FusekiException;
 import org.apache.jena.fuseki.servlets.HttpAction;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.Node;
@@ -44,7 +41,7 @@ import org.apache.jena.sparql.util.Convert;
 public class FusekiNetLib {
     /**
      * Get the content type of an action or return the default.
-     * @param  request
+     * @param  request Request
      * @return ContentType
      */
     public static ContentType getContentType(HttpServletRequest request) {
@@ -56,7 +53,7 @@ public class FusekiNetLib {
 
     /**
      * Get the incoming {@link Lang} based on Content-Type of an action.
-     * @param  action
+     * @param  action HttpAction
      * @param  dft Default if no "Content-Type:" found.
      * @return ContentType
      */
@@ -90,10 +87,10 @@ public class FusekiNetLib {
 
     /** Helper function for displaying an HttpServletRequest */
     public static String fmtRequest(HttpServletRequest request) {
-        StringBuffer sbuff = new StringBuffer();
+        StringBuilder sbuff = new StringBuilder();
         sbuff.append(request.getMethod());
         sbuff.append(" ");
-        sbuff.append(Convert.decWWWForm(request.getRequestURL()));
+        sbuff.append(Convert.decWWWForm(request.getRequestURL().toString()));
 
         String qs = request.getQueryString();
         if ( qs != null ) {
@@ -107,8 +104,8 @@ public class FusekiNetLib {
     }
 
     /** Parse the query string - do not process the body even for a form */
-    public static Multimap<String, String> parseQueryString(HttpServletRequest req) {
-        Multimap<String, String> map = ArrayListMultimap.create();
+    public static MultiValuedMap<String, String> parseQueryString(HttpServletRequest req) {
+        MultiValuedMap<String, String> map = MultiMapUtils.newListValuedHashMap();
 
         // Don't use ServletRequest.getParameter or getParamterNames
         // as that reads form data. This code parses just the query string.
@@ -172,15 +169,5 @@ public class FusekiNetLib {
         PrefixMapping pmapSrc = src.getDefaultGraph().getPrefixMapping();
         PrefixMapping pmapDest = dest.getDefaultGraph().getPrefixMapping();
         pmapDest.withDefaultMappings(pmapSrc);
-    }
-
-    /** Use {@link WebLib#choosePort} or start servers with port 0 and then ask which port was allocated. */
-    @Deprecated
-    public static int choosePort() {
-        try {
-            return WebLib.choosePort();
-        } catch (RuntimeException ex) {
-            throw new FusekiException(ex.getMessage());
-        }
     }
 }

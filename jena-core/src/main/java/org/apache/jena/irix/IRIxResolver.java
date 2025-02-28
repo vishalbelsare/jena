@@ -25,16 +25,25 @@ import org.apache.jena.atlas.lib.Cache;
 import org.apache.jena.atlas.lib.CacheFactory;
 
 /**
- * A resolver is a base IRI and a policy for resolution. The policy choices are
- * whether to resolve against the base, or only consider the IRI being processed, and
- * whether to allow relative IRIs or to enforce that "base resolve IRI" is an
- * acceptable IRI for use in RDF (the test is {@link IRIx#isReference()}).
+ * A resolver is a base IRI and a policy for resolution.
+ * Use of an {@code IRIxResolver} should be from a single thread
+ * because the {@code IRIxResolver} has a light-weight single thread cache.
+ *
+ * The policy choices are
+ * <ul>
+ * <li>whether to resolve against the base, or only consider the IRI being processed</li>
+ * <li>whether to allow relative IRIs after resolving</li>
+ * </ul>
  * <p>
- * Normal use is to resolve and not allow relative IRIs.
- * <p>
+ * The normal behaviour is to resolve URIs and not allow relative IRIs.
+ * </p><p>
+ * A setup with "don't resolve" and "allow relative URIs" passes URIs through untouched,
+ * although a parser may issue a warning.
+ * </p><p>
  * The base may be null to support passing around a resolver that accepts/reject
  * IRIs. For application to check IRIs, use {@link IRIs#check}/{@link IRIs#checkEx}
  * directly.
+ * </p>
  */
 public class IRIxResolver {
 
@@ -54,13 +63,23 @@ public class IRIxResolver {
     /** Return the base of this resolver as a string */
     public String getBaseURI() { return base == null ? null : base.str(); }
 
+    /**
+     * Clone an {@code IRIxResolver}.
+     * This clone may be used on a different thread.
+     */
+    @Override
+    public IRIxResolver clone() {
+        return new IRIxResolver(base, resolve, allowRelative);
+    }
+
     /*
-     * Some providers are expensive compared to the cost of parsing.
+     * Resolving IRIs is sufficiently expensive that a cache helps.
      * During parsing a lot of IRIs are being created, many the same. For example,
-     * e.g. properties or blocks of triples with the same subject.
+     * e.g. properties or blocks of triples with the same subject so there is a space
+     * saving as well.
      */
     private static int DftCacheSize = 500;
-    private Cache<String, IRIx> cache = CacheFactory.createCache(DftCacheSize);
+    private Cache<String, IRIx> cache = CacheFactory.createSimpleCache(DftCacheSize);
 
     /** Resolve the argument URI string according to resolver policy */
     public IRIx resolve(String other) {
@@ -70,16 +89,13 @@ public class IRIxResolver {
 
         // To allow for exceptions, we try the cache, and if no hit,
         // make the result then try again to fill the cache.
-        // Because for a given key there is one right answer, it does not matter
-        // if any thread gets in and changes the cache (cache operations are
-        // thread safe).
 
         IRIx iri = cache.getIfPresent(other);
         if ( iri != null )
             return iri;
         // May throw an exception
         IRIx iriValue = resolve0(other);
-        return cache.getOrFill(other, ()->iriValue);
+        return cache.get(other, k->iriValue);
     }
 
     private IRIx resolve0(String str) {
@@ -91,7 +107,7 @@ public class IRIxResolver {
         return x;
     }
 
-    /** Create a new resolver with the same policies as the old one. */
+    /** Create a new resolver with the same policies as the old one but with a different base URI. */
     public IRIxResolver resetBase(IRIx newBase) {
         return new IRIxResolver(newBase, resolve, allowRelative);
     }

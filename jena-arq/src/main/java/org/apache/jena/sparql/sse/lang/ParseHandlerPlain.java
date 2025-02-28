@@ -141,9 +141,9 @@ public class ParseHandlerPlain implements ParseHandler {
                 datatypeIRI = resolvePrefixedName(datatypePN, line, column);
 
             RDFDatatype dType = TypeMapper.getInstance().getSafeTypeByName(datatypeIRI);
-            n = NodeFactory.createLiteral(lexicalForm, dType);
+            n = NodeFactory.createLiteralDT(lexicalForm, dType);
         } else
-            n = NodeFactory.createLiteral(lexicalForm, langTag);
+            n = NodeFactory.createLiteralLang(lexicalForm, langTag);
         node(n, line, column);
     }
 

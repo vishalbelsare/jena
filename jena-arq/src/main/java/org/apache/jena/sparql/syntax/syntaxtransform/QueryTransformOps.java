@@ -18,6 +18,8 @@
 
 package org.apache.jena.sparql.syntax.syntaxtransform;
 
+import static org.apache.jena.sparql.syntax.syntaxtransform.QuerySyntaxSubstituteScope.scopeCheck;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,41 +30,87 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryVisitor;
 import org.apache.jena.query.SortCondition;
-import org.apache.jena.rdf.model.Literal ;
-import org.apache.jena.rdf.model.RDFNode ;
-import org.apache.jena.rdf.model.Resource ;
+import org.apache.jena.rdf.model.Literal;
+import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.shared.JenaException;
 import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.shared.impl.PrefixMappingImpl;
 import org.apache.jena.sparql.ARQException;
 import org.apache.jena.sparql.core.*;
-import org.apache.jena.sparql.expr.Expr;
-import org.apache.jena.sparql.expr.ExprTransform;
-import org.apache.jena.sparql.expr.ExprTransformer;
-import org.apache.jena.sparql.expr.ExprVar;
+import org.apache.jena.sparql.expr.*;
 import org.apache.jena.sparql.graph.NodeTransform;
 import org.apache.jena.sparql.modify.request.QuadAcc;
 import org.apache.jena.sparql.syntax.*;
 
 /** Support for transformation of query abstract syntax. */
 public class QueryTransformOps {
-    /** Transform a query based on a mapping from {@link Var} variable to replacement {@link Node}. */
+
+    /**
+     * Replace variables in a query by RDF terms.
+     * The replacements are added to the return queries SELECT clause (if a SELECT query).
+     * <p>
+     * @throws QueryScopeException if the query contains variables used in a
+     *   way that does not allow substitution (.e.g {@code AS ?var} or used in
+     *   {@code VALUES}).
+     */
+    public static Query syntaxSubstitute(Query input, Map<Var, Node> substitutions) {
+        scopeCheck(input, substitutions.keySet());
+        Query output = transformTopLevel(input, substitutions);
+        return output;
+    }
+
+    // Call transform, add in the substitutions as top-level SELECT expressions/
+    private static Query transformTopLevel(Query query, Map<Var, Node> substitutions) {
+        Query query2 = transformSubstitute(query, substitutions);
+        // Include substitutions
+        if ( query.isSelectType() ) {
+            query2.setQueryResultStar(false);
+            substitutions.forEach((v, n) -> {
+                var nv = NodeValue.makeNode(n);
+                query2.getProject().update(v, NodeValue.makeNode(n));
+            });
+        }
+        return query2;
+    }
+
+    /** @deprecated Use {@link #queryReplaceVars} */
+    @Deprecated
     public static Query transform(Query query, Map<Var, ? extends Node> substitutions) {
-        ElementTransform eltrans = new ElementTransformSubst(substitutions);
-        NodeTransform nodeTransform = new NodeTransformSubst(substitutions);
-        ExprTransform exprTrans = new ExprTransformNodeElement(nodeTransform, eltrans);
-        return transform(query, eltrans, exprTrans);
+        return replaceVars(query, substitutions);
+    }
+
+    /** Transform a query based on a mapping from {@link Var} variable to replacement {@link Node}. */
+    public static Query replaceVars(Query query, Map<Var, ? extends Node> substitutions) {
+        return transformSubstitute(query, substitutions);
+    }
+
+
+    /** @deprecated Use {@link #queryReplaceVars} */
+    @Deprecated
+    public static Query transformQuery(Query query, Map<String, ? extends RDFNode> substitutions)    {
+        return queryReplaceVars(query, substitutions);
     }
 
     /**
      * Transform a query based on a mapping from variable name to replacement
      * {@link RDFNode} (a {@link Resource} (or blank node) or a {@link Literal}).
      */
-    public static Query transformQuery(Query query, Map<String, ? extends RDFNode> substitutions) {
+    public static Query queryReplaceVars(Query query, Map<String, ? extends RDFNode> substitutions) {
         // Must have a different name because of Java's erasure of parameterised types.
         Map<Var, Node> map = TransformElementLib.convert(substitutions);
-        return transform(query, map);
+        return replaceVars(query, map);
     }
+
+    private static Query transformSubstitute(Query query, Map<Var, ? extends Node> substitutions) {
+        scopeCheck(query, substitutions.keySet());
+        ElementTransform eltrans = new ElementTransformSubst(substitutions);
+        NodeTransform nodeTransform = new NodeTransformSubst(substitutions);
+        ExprTransform exprTrans = new ExprTransformNodeElement(nodeTransform, eltrans);
+        return transform(query, eltrans, exprTrans);
+    }
+
+    // ----------------
 
     /**
      * Transform a query using {@link ElementTransform} and {@link ExprTransform}.
@@ -71,8 +119,7 @@ public class QueryTransformOps {
     public static Query transform(Query query, ElementTransform transform, ExprTransform exprTransform) {
         Query q2 = QueryTransformOps.shallowCopy(query);
         // Mutate the q2 structures which are already allocated and no other code can access yet.
-
-        mutateByQueryType(q2, transform, exprTransform);
+        mutateByQueryType(q2, exprTransform);
         mutateVarExprList(q2.getGroupBy(), exprTransform);
         mutateExprList(q2.getHavingExprs(), exprTransform);
         if (q2.getOrderBy() != null)
@@ -82,6 +129,7 @@ public class QueryTransformOps {
             // Reset internal to only what now can be seen.
             q2.resetResultVars();
         }
+        setAggregators(q2, query, exprTransform);
         return q2;
     }
 
@@ -111,8 +159,14 @@ public class QueryTransformOps {
         }
     }
 
+    private static void setAggregators(Query newQuery, Query query, ExprTransform exprTransform) {
+        for (ExprAggregator aggregator : query.getAggregators()) {
+            newQuery.getAggregators().add((ExprAggregator) exprTransform.transform(aggregator));
+        }
+    }
+
     // Do the result form part of the cloned query.
-    private static void mutateByQueryType(Query q2, ElementTransform transform, ExprTransform exprTransform) {
+    private static void mutateByQueryType(Query q2, ExprTransform exprTransform) {
         switch(q2.queryType()) {
             case ASK : break;
             case CONSTRUCT :
@@ -121,7 +175,7 @@ public class QueryTransformOps {
                 Template template = q2.getConstructTemplate();
                 QuadAcc acc = new QuadAcc();
                 List<Quad> quads = template.getQuads();
-                template.getQuads().forEach(q->{
+                quads.forEach(q->{
                     Node g = transform(q.getGraph(), exprTransform);
                     Node s = transform(q.getSubject(), exprTransform);
                     Node p = transform(q.getPredicate(), exprTransform);
@@ -141,7 +195,8 @@ public class QueryTransformOps {
             case CONSTRUCT_JSON :
                 throw new UnsupportedOperationException("Transform of JSON template queries");
             case UNKNOWN :
-                throw new JenaException("Unknown qu ery type");
+            default :
+                throw new JenaException("Unknown query type");
         }
     }
 
@@ -274,7 +329,7 @@ public class QueryTransformOps {
         if (e2 == null || e2 == ev )
             return node;
         if ( ! e2.isConstant() )
-            return node ;
+            return node;
         return e2.getConstant().getNode();
     }
 
@@ -300,14 +355,11 @@ public class QueryTransformOps {
                 for (String x : desc.getNamedGraphURIs())
                     newQuery.addNamedGraphURI(x);
             }
-
-            // Aggregators.
-            newQuery.getAggregators().addAll(query.getAggregators());
         }
 
         @Override
         public void visitPrologue(Prologue prologue) {
-            // newQuery.setBaseURI(prologue.getResolver()) ;
+            // newQuery.setBaseURI(prologue.getResolver());
             PrefixMapping pmap = new PrefixMappingImpl().setNsPrefixes(prologue.getPrefixMapping());
             newQuery.setPrefixMapping(pmap);
         }

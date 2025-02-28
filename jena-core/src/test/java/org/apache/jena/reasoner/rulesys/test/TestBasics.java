@@ -20,20 +20,47 @@ package org.apache.jena.reasoner.rulesys.test;
 
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
-import java.util.*;
-import java.io.*;
-
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.TypeMapper;
-import org.apache.jena.graph.* ;
-import org.apache.jena.rdf.model.* ;
-import org.apache.jena.reasoner.* ;
-import org.apache.jena.reasoner.rulesys.* ;
-import org.apache.jena.reasoner.rulesys.impl.* ;
-import org.apache.jena.reasoner.test.TestUtil ;
-import org.apache.jena.util.PrintUtil ;
-import org.apache.jena.vocabulary.* ;
+import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.GraphMemFactory;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
+import org.apache.jena.graph.Triple;
+import org.apache.jena.rdf.model.Literal;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.reasoner.Derivation;
+import org.apache.jena.reasoner.InfGraph;
+import org.apache.jena.reasoner.Reasoner;
+import org.apache.jena.reasoner.StandardValidityReport;
+import org.apache.jena.reasoner.TriplePattern;
+import org.apache.jena.reasoner.ValidityReport;
+import org.apache.jena.reasoner.rulesys.BasicForwardRuleInfGraph;
+import org.apache.jena.reasoner.rulesys.BasicForwardRuleReasoner;
+import org.apache.jena.reasoner.rulesys.ForwardRuleInfGraphI;
+import org.apache.jena.reasoner.rulesys.FunctorDatatype;
+import org.apache.jena.reasoner.rulesys.Node_RuleVariable;
+import org.apache.jena.reasoner.rulesys.Rule;
+import org.apache.jena.reasoner.rulesys.RuleContext;
+import org.apache.jena.reasoner.rulesys.Util;
+import org.apache.jena.reasoner.rulesys.impl.BFRuleContext;
+import org.apache.jena.reasoner.rulesys.impl.BindingStack;
+import org.apache.jena.reasoner.rulesys.impl.FRuleEngine;
+import org.apache.jena.reasoner.test.TestUtil;
+import org.apache.jena.util.PrintUtil;
+import org.apache.jena.vocabulary.OWL;
+import org.apache.jena.vocabulary.RDF;
+import org.apache.jena.vocabulary.ReasonerVocabulary;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Unit tests for simple infrastructure pieces of the rule systems.
@@ -236,6 +263,8 @@ public class TestBasics extends TestCase  {
         try {
             // And run on expected
             Rule r2 = Rule.parseRule(expected);
+            r.equals(r2);
+
             assertEquals(r, r2);
         } catch (Rule.ParserException ex) {
             System.err.println(expected);
@@ -361,7 +390,7 @@ public class TestBasics extends TestCase  {
                        "[r4: (n4 ?p ?a) -> (n4, ?a, ?p)]";
         List<Rule> ruleList = Rule.parseRules(rules);
 
-        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(Factory.createGraphMem());
+        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(GraphMemFactory.createGraphMem());
         infgraph.add(Triple.create(n1, p, n2));
         infgraph.add(Triple.create(n2, p, n3));
         infgraph.add(Triple.create(n2, q, n3));
@@ -388,7 +417,7 @@ public class TestBasics extends TestCase  {
                        "[testRule3: (n2 p ?a), (n2 q ?a) -> (res p ?a)]";
         List<Rule> ruleList = Rule.parseRules(rules);
 
-        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(Factory.createGraphMem());
+        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(GraphMemFactory.createGraphMem());
         infgraph.setDerivationLogging(true);
         infgraph.add(Triple.create(n1, p, n3));
         infgraph.add(Triple.create(n1, q, n4));
@@ -433,7 +462,7 @@ public class TestBasics extends TestCase  {
                        "[axiom1: -> (n1 p n3)]";
         List<Rule> ruleList = Rule.parseRules(rules);
 
-        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(Factory.createGraphMem());
+        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(GraphMemFactory.createGraphMem());
         TestUtil.assertIteratorValues(this, infgraph.find(null, null, null),
             new Triple[] {
                 Triple.create(n1, p, n3),
@@ -464,9 +493,9 @@ public class TestBasics extends TestCase  {
                        "[testRule2: (n1 q ?a) -> (n2, q, ?a)]" +
                        "[testRule3: (n2 p ?a), (n2 q ?a) -> (res p ?a)]";
         List<Rule> ruleList = Rule.parseRules(rules);
-        Graph schema = Factory.createGraphMem();
+        Graph schema = GraphMemFactory.createGraphMem();
         schema.add(Triple.create(n1, p, n3));
-        Graph data = Factory.createGraphMem();
+        Graph data = GraphMemFactory.createGraphMem();
         data.add(Triple.create(n1, q, n4));
         data.add(Triple.create(n1, q, n3));
 
@@ -514,14 +543,11 @@ public class TestBasics extends TestCase  {
         Resource foo = infModel.createResource(PrintUtil.egNS + "foo");
         Resource bar = infModel.createResource(PrintUtil.egNS + "bar");
 
-        RDFNode flit = infModel.getResource(R1.getURI()).getRequiredProperty(rbr).getObject();
-        assertNotNull(flit);
-        assertEquals(flit.toString(), "allOK");
-//        assertTrue(flit instanceof Literal);
-//        Functor func = (Functor)((Literal)flit).getValue();
-//        assertEquals("all", func.getName());
-//        assertEquals(p.getNode(), func.getArgs()[0]);
-//        assertEquals(D.getNode(), func.getArgs()[1]);
+        RDFNode fLit = infModel.getResource(R1.getURI()).getRequiredProperty(rbr).getObject();
+        assertNotNull(fLit);
+        assertTrue(fLit.isLiteral());
+        String strflit = fLit.asLiteral().getLexicalForm();
+        assertEquals("allOK", strflit);
 
         Literal one = (Literal)foo.getRequiredProperty(propbar).getObject();
         assertEquals(Integer.valueOf(1), one.getValue());
@@ -539,7 +565,7 @@ public class TestBasics extends TestCase  {
                        "";
         List<Rule> ruleList = Rule.parseRules(rules);
 
-        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(Factory.createGraphMem());
+        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(GraphMemFactory.createGraphMem());
         TestUtil.assertIteratorValues(this, infgraph.find(n1, q, null),
             new Triple[] {
                 Triple.create(n1, q, Util.makeIntNode(2)),
@@ -561,7 +587,7 @@ public class TestBasics extends TestCase  {
                        "";
         List<Rule> ruleList = Rule.parseRules(rules);
 
-        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(Factory.createGraphMem());
+        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(GraphMemFactory.createGraphMem());
         infgraph.add(Triple.create(n1, p, Util.makeIntNode(1)));
         infgraph.add(Triple.create(n1, p, Util.makeIntNode(2)));
         infgraph.add(Triple.create(n1, q, Util.makeIntNode(2)));
@@ -583,7 +609,7 @@ public class TestBasics extends TestCase  {
                        "";
         List<Rule> ruleList = Rule.parseRules(rules);
 
-        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(Factory.createGraphMem());
+        InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(GraphMemFactory.createGraphMem());
         infgraph.add(Triple.create(n1, p, Util.makeIntNode(1)));
         infgraph.add(Triple.create(n1, p, Util.makeIntNode(2)));
         infgraph.add(Triple.create(n1, q, Util.makeIntNode(2)));
@@ -601,7 +627,7 @@ public class TestBasics extends TestCase  {
     public void testRebind() {
         String rules = "[rule1: (?x p ?y) -> (?x q ?y)]";
         List<Rule> ruleList = Rule.parseRules(rules);
-        Graph data = Factory.createGraphMem();
+        Graph data = GraphMemFactory.createGraphMem();
         data.add(Triple.create(n1, p, n2));
         InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(data);
         TestUtil.assertIteratorValues(this, infgraph.find(n1, null, null),
@@ -609,7 +635,7 @@ public class TestBasics extends TestCase  {
                 Triple.create(n1, p, n2),
                 Triple.create(n1, q, n2)
             });
-        Graph ndata = Factory.createGraphMem();
+        Graph ndata = GraphMemFactory.createGraphMem();
         ndata.add(Triple.create(n1, p, n3));
         infgraph.rebind(ndata);
         TestUtil.assertIteratorValues(this, infgraph.find(n1, null, null),
@@ -625,7 +651,7 @@ public class TestBasics extends TestCase  {
     public void testSize() {
         String rules = "[rule1: (?x p ?y) -> (?x q ?y)]";
         List<Rule> ruleList = Rule.parseRules(rules);
-        Graph data = Factory.createGraphMem();
+        Graph data = GraphMemFactory.createGraphMem();
         data.add(Triple.create(n1, p, n2));
         InfGraph infgraph = new BasicForwardRuleReasoner(ruleList).bind(data);
         assertEquals(infgraph.size(), 2);
@@ -659,7 +685,7 @@ public class TestBasics extends TestCase  {
      * Test the list conversion utility that is used in some of the builtins.
      */
     public void testConvertList() {
-        Graph data = Factory.createGraphMem();
+        Graph data = GraphMemFactory.createGraphMem();
         Node first = RDF.Nodes.first;
         Node rest  = RDF.Nodes.rest;
         Node nil = RDF.Nodes.nil;

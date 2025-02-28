@@ -17,10 +17,10 @@
 
 package org.apache.jena.ext.xerces.jaxp.datatype;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -96,7 +96,6 @@ import org.apache.jena.ext.xerces.util.DatatypeMessageFormatter;
  * @version $Id: DurationImpl.java 944783 2010-05-16 09:45:19Z mukulg $
  * @see XMLGregorianCalendar#add(Duration)
  */
-@SuppressWarnings("all")
 class DurationImpl
     extends Duration
     implements Serializable {
@@ -677,8 +676,6 @@ class DurationImpl
      *   <li>{@link DatatypeConstants#INDETERMINATE} if a conclusive partial order relation cannot be determined</li>
      * </ul>
      *
-     * @param duration to compare
-     *
      * @return the relationship between <code>this</code> <code>Duration</code>and <code>duration</code> parameter as
      *   {@link DatatypeConstants#LESSER}, {@link DatatypeConstants#EQUAL}, {@link DatatypeConstants#GREATER}
      *   or {@link DatatypeConstants#INDETERMINATE}.
@@ -977,7 +974,7 @@ class DurationImpl
      */
     @Override
     public String toString() {
-        StringBuffer buf = new StringBuffer();
+        StringBuilder buf = new StringBuilder();
         if (signum < 0) {
             buf.append('-');
         }
@@ -1028,17 +1025,17 @@ class DurationImpl
         }
 
         /* Insert decimal point */
-        StringBuffer buf;
+        StringBuilder buf;
         int insertionPoint = intString.length() - scale;
         if (insertionPoint == 0) { /* Point goes right before intVal */
             return "0." + intString;
         }
         else if (insertionPoint > 0) { /* Point goes inside intVal */
-            buf = new StringBuffer(intString);
+            buf = new StringBuilder(intString);
             buf.insert(insertionPoint, '.');
         }
         else { /* We must insert zeros between point and intVal */
-            buf = new StringBuffer(3 - insertionPoint + intString.length());
+            buf = new StringBuilder(3 - insertionPoint + intString.length());
             buf.append("0.");
             for (int i = 0; i < -insertionPoint; i++) {
                 buf.append('0');
@@ -1530,7 +1527,7 @@ class DurationImpl
             BigDecimal bd = getFieldAsBigDecimal(FIELDS[i]);
             bd = bd.multiply(factor).add(carry);
 
-            buf[i] = bd.setScale(0, BigDecimal.ROUND_DOWN);
+            buf[i] = bd.setScale(0, RoundingMode.DOWN);
 
             bd = bd.subtract(buf[i]);
             if (i == 1) {
@@ -1737,9 +1734,7 @@ class DurationImpl
 
                     // compute the number of unit that needs to be borrowed.
                     BigDecimal borrow =
-                        buf[i].abs().divide(
-                            FACTORS[i - 1],
-                            BigDecimal.ROUND_UP);
+                        buf[i].abs().divide(FACTORS[i - 1], RoundingMode.UP);
                     if (buf[i].signum() > 0) {
                         borrow = borrow.negate();
                     }
@@ -1869,17 +1864,6 @@ class DurationImpl
             seconds);
     }
 
-    /**
-     * Returns the sign of this duration in -1,0, or 1.
-     *
-     * @return
-     *      -1 if this duration is negative, 0 if the duration is zero,
-     *      and 1 if the duration is postive.
-     */
-    public int signum() {
-        return signum;
-    }
-
 
     /**
      * Adds this duration to a {@link Calendar} object.
@@ -1931,7 +1915,7 @@ class DurationImpl
 
         if (seconds != null) {
             BigDecimal fraction =
-                seconds.subtract(seconds.setScale(0, BigDecimal.ROUND_DOWN));
+                seconds.subtract(seconds.setScale(0, RoundingMode.DOWN));
             int millisec = fraction.movePointRight(3).intValue();
             calendar.add(Calendar.MILLISECOND, millisec * signum);
         }

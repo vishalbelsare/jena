@@ -36,7 +36,7 @@ public class QueryExecHTTPBuilder extends ExecHTTPBuilder<QueryExecHTTP, QueryEx
 
     public static QueryExecHTTPBuilder service(String serviceURL) { return create().endpoint(serviceURL); }
 
-    private QueryExecHTTPBuilder() {}
+    protected QueryExecHTTPBuilder() {}
 
     @Override
     protected QueryExecHTTPBuilder thisBuilder() {
@@ -54,13 +54,19 @@ public class QueryExecHTTPBuilder extends ExecHTTPBuilder<QueryExecHTTP, QueryEx
     }
 
     @Override
+    public QueryExecHTTPBuilder timeout(long timeout) {
+        timeout(timeout, TimeUnit.MILLISECONDS);
+        return thisBuilder();
+    }
+
+    @Override
     public QueryExecHTTPBuilder initialTimeout(long timeout, TimeUnit timeUnit) {
         throw new UnsupportedOperationException();
     }
 
     @Override
     public QueryExecHTTPBuilder overallTimeout(long timeout, TimeUnit timeUnit) {
-        super.timeout(timeout, timeUnit);
+        timeout(timeout, timeUnit);
         return thisBuilder();
     }
 
