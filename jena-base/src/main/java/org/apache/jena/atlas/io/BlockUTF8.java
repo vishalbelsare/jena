@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -28,7 +28,7 @@ import java.nio.CharBuffer;
  * This code is just the UTF-8 encoding rules - it does not check for legality
  * of the Unicode data.  The standard codecs do, so do not round-trip with binary
  * compatibility. (Example: a single element of a surrogate pair will
- * be encoded/decoded without lost.)
+ * be encoded/decoded without loss.)
  *
  * The usual Charset encoders/decoders can be expensive to start up - they are also
  * not thread safe. Sometimes we want to convert 10's of chars and UTF-8 can be
@@ -57,7 +57,6 @@ public class BlockUTF8
      * 26   U+3FFFFFF                         111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
      * 31   U+7FFFFFFF                        1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
      */
-
 
     /**
      * Convert the bytes in the ByteBuffer to characters in the CharBuffer. The
@@ -113,8 +112,7 @@ public class BlockUTF8
                 continue;
             }
             if ( (x & 0xE0) == 0xC0 ) {
-                // 10 => extension byte
-                // 110..... => 2 bytes
+                // 110zzzzz => 2 bytes
                 // Unroll common path
                 //int ch = readMultiBytes(bb, x & 0x1F, 2);
                 int x2 = bb.get();
@@ -127,19 +125,34 @@ public class BlockUTF8
                 continue;
             }
             if ( (x & 0xF0) == 0xE0 ) {
-                //  1110.... => 3 bytes : 16 bits : not outside 16bit chars
+                //  1110zzzz => 3 bytes : 16 bits : not outside 16bit chars
                 int ch = readMultiBytes(bb, x & 0x0F, 3);
                 cb.put((char)ch);
                 idx += 3;
                 continue;
             }
             if ( (x & 0xF8) == 0xF0 ) {
-                // Looking like 4 byte character.
                 // 11110zzz => 4 bytes.
-                int ch = readMultiBytes(bb, x & 0x08, 4);
+                int ch = readMultiBytes(bb, x & 0x07, 4);
                 char chars[] = Character.toChars(ch);
                 cb.put(chars);
                 idx += 4;
+                continue;
+            }
+            if ( (x & 0xFC) == 0xF8 ) {
+                // 111110zz => 5 bytes.
+                int ch = readMultiBytes(bb, x & 0x03, 5);
+                char chars[] = Character.toChars(ch);
+                cb.put(chars);
+                idx += 5;
+                continue;
+            }
+            if ( (x & 0xFE) == 0xFC ) {
+                // 1111110z => 6 bytes.
+                int ch = readMultiBytes(bb, x & 0x01, 6);
+                char chars[] = Character.toChars(ch);
+                cb.put(chars);
+                idx += 6;
                 continue;
             }
             exception("Illegal UTF-8: 0x%04X",x);
@@ -192,9 +205,11 @@ public class BlockUTF8
                 bb.put((byte)x3);
                 continue;
             }
-            // if ( Character.isDefined(ch) )
-            //     throw new AtlasException("not a character");
-            // if ( true ) throw new InternalErrorException("Valid code point for Java but not encodable");
+
+            // End of Java.
+            // A Java char is 16 bit, unsigned, so it is between 0 and 0xFFFF.
+            // Unicode is defined for 0 to 0x10FFFF
+            // For reference the full 32 bits encodings are:
 
             if ( ch <= 0x1FFFFF ) {
                 // 21 bits : 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
@@ -210,7 +225,7 @@ public class BlockUTF8
             }
             if ( ch <= 0x7FFFFFFF ) {
                 // 32 bits : 1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
-                int x1 = (((ch >> (32 - 1)) & 0x1) | 0xFC);
+                int x1 = (((ch >> (31 - 1)) & 0x1) | 0xFC);
                 outputBytes(bb, x1, 6, ch);
                 continue;
             }

@@ -18,19 +18,45 @@
 
 package org.apache.jena.reasoner.rulesys.test;
 
-import java.io.* ;
-import java.util.* ;
-
-import org.apache.jena.ontology.OntModelSpec ;
-import org.apache.jena.rdf.model.* ;
+import org.apache.jena.ontology.OntModelSpec;
+import org.apache.jena.rdf.model.Literal;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.RDFWriterI;
+import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.Statement;
+import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.rdfxml.xmloutput.impl.RDFXML_Abbrev;
-import org.apache.jena.reasoner.InfGraph ;
-import org.apache.jena.reasoner.Reasoner ;
-import org.apache.jena.reasoner.ReasonerException ;
-import org.apache.jena.reasoner.ReasonerRegistry ;
-import org.apache.jena.reasoner.rulesys.FBRuleInfGraph ;
-import org.apache.jena.reasoner.test.WGReasonerTester ;
-import org.apache.jena.vocabulary.* ;
+import org.apache.jena.reasoner.InfGraph;
+import org.apache.jena.reasoner.Reasoner;
+import org.apache.jena.reasoner.ReasonerException;
+import org.apache.jena.reasoner.ReasonerRegistry;
+import org.apache.jena.reasoner.rulesys.FBRuleInfGraph;
+import org.apache.jena.reasoner.test.WGReasonerTester;
+import org.apache.jena.vocabulary.OWL;
+import org.apache.jena.vocabulary.OWLResults;
+import org.apache.jena.vocabulary.OWLTest;
+import org.apache.jena.vocabulary.RDF;
+import org.apache.jena.vocabulary.RDFS;
+import org.apache.jena.vocabulary.RDFTest;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Test harness for running the WebOnt working group tests relevant
@@ -72,8 +98,8 @@ public class WebOntTestHarness {
     /** The model describing the results of the run */
     Model testResults;
 
-    /** The resource which acts as a description for the Jena2 instance being tested */
-    Resource jena2;
+    /** The resource which acts as a description for the Jena instance being tested */
+    Resource jena;
 
 //  =======================================================================
 //  Internal constants
@@ -85,7 +111,7 @@ public class WebOntTestHarness {
     public static String BASE_URI = "http://www.w3.org/2002/03owlt/";
 
     /** The base URI for the results file */
-    public static String BASE_RESULTS_URI = "http://jena.sourceforge.net/data/owl-results.rdf";
+    public static String BASE_RESULTS_URI = "https://jena.apache.org/data/owl-results.rdf";
 
     /** The list of subdirectories to process (omits the rdf/rdfs dirs) */
     public static final String[] TEST_DIRS= {"AllDifferent", "AllDistinct",
@@ -250,16 +276,8 @@ public class WebOntTestHarness {
      */
     public void initResults() {
         testResults = ModelFactory.createDefaultModel();
-        jena2 = testResults.createResource(BASE_RESULTS_URI + "#jena2");
-        jena2.addProperty(RDFS.comment,
-            testResults.createLiteral(
-                "<a xmlns=\"http://www.w3.org/1999/xhtml\" href=\"http://jena.sourceforce.net/\">Jena2</a> includes a rule-based inference engine for RDF processing, " +
-                "supporting both forward and backward chaining rules. Its OWL rule set is designed to provide sound " +
-                "but not complete instance resasoning for that fragment of OWL/Full limited to the OWL/lite vocabulary. In" +
-                "particular it does not support unionOf/complementOf.",
-                true)
-        );
-        jena2.addProperty(RDFS.label, "Jena2");
+        jena = testResults.createResource(BASE_RESULTS_URI + "#jena");
+        jena.addProperty(RDFS.label, "Jena");
         testResults.setNsPrefix("results", OWLResults.NS);
     }
 
@@ -364,7 +382,7 @@ public class WebOntTestHarness {
             .addProperty(RDF.type, OWLResults.TestRun)
             .addProperty(RDF.type, resultType)
             .addProperty(OWLResults.test, test)
-            .addProperty(OWLResults.system, jena2);
+            .addProperty(OWLResults.system, jena);
     }
 
     /**
@@ -472,7 +490,7 @@ public class WebOntTestHarness {
         if (fname.startsWith(BASE_URI)) {
             fname = fname.substring(BASE_URI.length());
         }
-        Reader reader = new BufferedReader(new FileReader(BASE_TESTDIR + fname));
+        Reader reader = new BufferedReader(new FileReader(BASE_TESTDIR + fname, StandardCharsets.UTF_8));
         model.read(reader, BASE_URI + fname, langType);
         return model;
     }

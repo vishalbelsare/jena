@@ -23,15 +23,54 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * List of {@linkplain FusekiModule Fuseki modules}.
- * This is the immutable collection of modules for a server.
+ * A collection of {@linkplain FusekiModule Fuseki modules}.
  * <p>
- * @see FusekiModulesLoaded
+ * There is one specific collection of modules - a system wide set of modules.
+ * This collection defaults to the automatically discovered modules {@link FusekiAutoModules#get()}.
+ *
+ * @see FusekiAutoModules
  */
 public class FusekiModules {
 
+    // Null means "not initialized".
+    // Null should never leave this class!
+    private static FusekiModules systemFusekiModules = null;
+
+    /**
+     * There is a system wide set of modules used when no other modules are indicated.
+     * These default to the automatically discovered modules.
+     *
+     * Use {@link #resetSystemDefault} to cause a reload of Fuseki auto modules.
+     */
+    public static void setSystemDefault(FusekiModules fusekiModules) {
+        systemFusekiModules = ( fusekiModules == null ) ? FusekiModules.create() : fusekiModules;
+    }
+
+    /** Restore the original setting of the system default collection. */
+    public static void restoreSystemDefault() {
+        systemFusekiModules = null;
+    }
+
+    public static FusekiModules getSystemModules() {
+        if ( systemFusekiModules == null )
+            systemFusekiModules = FusekiAutoModules.get();
+        return systemFusekiModules;
+    }
+
+    // Do initialization at a predictable point.
+    /*package*/ static void init() {}
+
+    // ----
+
     /** A Fuseki module with no members. */
-    public static final FusekiModules empty = FusekiModules.create();
+    public static final FusekiModules empty() { return FusekiModules.create(); }
+
+    // Testing.
+    /*package*/ static void resetSystemDefault() {
+        // Reload, reset. Fresh objects.
+        FusekiAutoModules.reset();
+        systemFusekiModules = FusekiAutoModules.get();
+    }
 
     /** Create a collection of Fuseki modules */
     public static FusekiModules create(FusekiModule ... modules) {

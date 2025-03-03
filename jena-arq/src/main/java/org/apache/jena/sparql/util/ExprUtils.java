@@ -50,13 +50,6 @@ public class ExprUtils
 {
     static { JenaSystem.init(); }
 
-    /** Go from a node to an expression.
-     * @deprecated Use {@link ExprLib#nodeToExpr(Node)} instead*/
-    @Deprecated
-    public static Expr nodeToExpr(Node n) {
-        return ExprLib.nodeToExpr(n);
-    }
-
     public static Expr parse(String s) {
         return parse(s, ARQConstants.getGlobalPrefixMap());
     }
@@ -210,7 +203,7 @@ public class ExprUtils
     public static NodeValue eval(Expr expr, Binding binding) {
         Context context = ARQ.getContext().copy();
         context.set(ARQConstants.sysCurrentTime, NodeFactoryExtra.nowAsDateTime());
-        FunctionEnv env = new ExecutionContext(context, null, null, null);
+        FunctionEnv env = ExecutionContext.create(null, context);
         NodeValue r = expr.eval(binding, env);
         return r;
     }

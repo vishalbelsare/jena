@@ -29,7 +29,7 @@ import java.util.function.BiConsumer;
 public class IRIProviderAny  implements IRIProvider {
 
     /** The IRIProvider builder does not create this kind of IRIProvider! */
-    public static IRIProviderAny stringProvider() {return new IRIProviderAny(); }
+    public static IRIProviderAny stringProvider() { return new IRIProviderAny(); }
 
     public IRIProviderAny() {}
 
@@ -43,6 +43,7 @@ public class IRIProviderAny  implements IRIProvider {
         @Override public boolean isAbsolute()               { return true; }
         @Override public boolean isRelative()               { return false; }
         @Override public boolean hasScheme(String scheme)   { return str().startsWith(scheme); }
+        @Override public String  scheme()                   { return IRIs.scheme(str()); }
 
         @Override
         public boolean isReference() {

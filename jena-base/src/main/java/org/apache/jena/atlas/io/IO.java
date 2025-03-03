@@ -21,6 +21,8 @@ package org.apache.jena.atlas.io;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -207,9 +209,15 @@ public class IO
         return new InputStreamReader(in, StandardCharsets.UTF_8);
     }
 
+
     /** Create a unbuffered reader that uses ASCII encoding */
     static public Reader asASCII(InputStream in) {
-        return new InputStreamReader(in, StandardCharsets.US_ASCII);
+        //return new InputStreamReader(in, StandardCharsets.US_ASCII);
+
+        CharsetDecoder dec = StandardCharsets.US_ASCII.newDecoder();
+        // Make into an error - the default is REPLACE (insert unicode U+FFFD)
+        dec.onMalformedInput(CodingErrorAction.REPORT);
+        return new InputStreamReader(in, dec);
     }
 
     /** Create an buffered reader that uses UTF-8 encoding */
@@ -269,6 +277,9 @@ public class IO
         }
         return out;
     }
+
+    /** An {@link OutputStream} that discards all bytes. */
+    static public OutputStream sink()                       { return OutputStream.nullOutputStream(); }
 
     /** Wrap in a general writer interface */
     static public AWriter wrap(Writer w)                    { return Writer2.wrap(w); }
@@ -571,7 +582,7 @@ public class IO
      * This function does not follow symbolic links.
      */
     public static void deleteAll(Path start) {
-        // Walks down the tree and delete directories on the way backup.
+        // Walk down the tree deleting files, and delete directories on the way backup.
         try {
             Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
                 @Override
@@ -590,7 +601,7 @@ public class IO
                 }
             });
         }
-        catch (IOException ex) { IO.exception(ex); return; }
+        catch (IOException ex) { throw IOX.exception(ex); }
     }
 
     // Do nothing buffer.  Never read from this, it may be corrupt because it is shared.

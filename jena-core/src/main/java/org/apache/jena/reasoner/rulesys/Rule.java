@@ -35,7 +35,7 @@ import org.apache.jena.shared.WrappedIOException ;
 import org.apache.jena.util.FileManager ;
 import org.apache.jena.util.FileUtils ;
 import org.apache.jena.util.PrintUtil ;
-import org.apache.jena.util.Tokenizer ;
+import org.apache.jena.util.SimpleTokenizer ;
 import org.slf4j.Logger ;
 import org.slf4j.LoggerFactory ;
 
@@ -702,7 +702,7 @@ public class Rule implements ClauseEntry {
     public static class Parser {
 
         /** Tokenizer */
-        private Tokenizer stream;
+        private SimpleTokenizer stream;
 
         /** Look ahead, null if none */
         private String lookahead;
@@ -738,7 +738,7 @@ public class Rule implements ClauseEntry {
          * @param source the string to be parsed
          */
         Parser(String source,BuiltinRegistry registry) {
-            stream = new Tokenizer(source, "()[], \t\n\r", "'\"", true);
+            stream = new SimpleTokenizer(source, "()[], \t\n\r", "'\"", true);
             lookahead = null;
             this.registry=registry;
         }
@@ -944,9 +944,9 @@ public class Rule implements ClauseEntry {
                         }
                     }
                     RDFDatatype dt = TypeMapper.getInstance().getSafeTypeByName(dtURI);
-                    return NodeFactory.createLiteral(lit, dt);
+                    return NodeFactory.createLiteralDT(lit, dt);
                 } else {
-                    return NodeFactory.createLiteral(lit);
+                    return NodeFactory.createLiteralString(lit);
                 }
             } else  if ( Character.isDigit(token.charAt(0)) ||
                          (token.charAt(0) == '-' && token.length() > 1 && Character.isDigit(token.charAt(1))) ) {
@@ -972,17 +972,17 @@ public class Rule implements ClauseEntry {
                 if ( lit.contains( "." ) ) {
                     // Float?
                     if (XSDDatatype.XSDfloat.isValid(lit)) {
-                        return NodeFactory.createLiteral(lit, XSDDatatype.XSDfloat);
+                        return NodeFactory.createLiteralDT(lit, XSDDatatype.XSDfloat);
                     }
                 } else {
                     // Int?
                     if (XSDDatatype.XSDint.isValid(lit)) {
-                        return NodeFactory.createLiteral(lit, XSDDatatype.XSDint);
+                        return NodeFactory.createLiteralDT(lit, XSDDatatype.XSDint);
                     }
                 }
             }
             // Default is a plain literal
-            return NodeFactory.createLiteral(lit, "");
+            return NodeFactory.createLiteralLang(lit, "");
         }
 
         /**

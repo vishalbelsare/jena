@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -99,12 +99,12 @@ public class Subsystem<T extends SubsystemLifecycle> {
 
             get().load() ;
 
-            // Debug : what did we find?
-            if ( DEBUG_INIT ) {
-                logLifecycle("Found:") ;
-                get().snapshot().forEach(mod->
-                logLifecycle("  %-20s [%d]", mod.getClass().getSimpleName(), mod.level())) ;
-            }
+//            // Debug : what did we find?
+//            if ( DEBUG_INIT ) {
+//                logLifecycle("Found:") ;
+//                get().snapshot().forEach(mod->
+//                    logLifecycle("  %-20s [%d]", mod.getClass().getSimpleName(), mod.level())) ;
+//            }
 
             if ( DEBUG_INIT ) {
                 logLifecycle("Initialization sequence:") ;

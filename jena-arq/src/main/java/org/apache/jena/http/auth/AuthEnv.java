@@ -56,9 +56,13 @@ public class AuthEnv {
     private AuthEnv() { }
 
     /** Register (username, password) information for a URI endpoint. */
-    public void registerUsernamePassword(URI uri, String user, String password) {
+    public void registerUsernamePassword(String uri, String username, String password) {
+        registerUsernamePassword(URI.create(uri), username, password);
+    }
+    /** Register (username, password) information for a URI endpoint. */
+    public void registerUsernamePassword(URI uri, String username, String password) {
         AuthDomain domain = new AuthDomain(uri);
-        passwordRegistry.put(domain, new PasswordRecord(user, password));
+        passwordRegistry.put(domain, new PasswordRecord(username, password));
         // Remove any existing registration for this URI,
         // but not registrations with this URI as prefix.
         // unregisterUsernamePassword() removes registration
@@ -70,6 +74,13 @@ public class AuthEnv {
     public boolean hasRegistation(URI uri) {
         AuthDomain location = new AuthDomain(uri);
         return passwordRegistry.contains(location);
+    }
+
+    /**
+     * Remove the registration for a URI endpoint.
+     */
+    public void unregisterUsernamePassword(String uri) {
+        unregisterUsernamePassword(URI.create(uri));
     }
 
     /**
@@ -111,6 +122,7 @@ public class AuthEnv {
     public void clearAuthEnv() {
         passwordRegistry.clearAll();
         authModifiers.clear();
+        tokenSupplier = null;
     }
 
     /**

@@ -26,18 +26,17 @@ import java.util.List;
 /**
  * Incoming String[] to a list of argument/values + items.
  */
-
 public class CommandLineBase {
     private List<String> argList = new ArrayList<>();
     boolean splitTerms = true;
 
-    public CommandLineBase(String[] args) {
+    public CommandLineBase(String... args) {
         setArgs(args);
     }
 
     public CommandLineBase() {}
 
-    public void setArgs(String[] argv) {
+    public void setArgs(String... argv) {
         argList = processArgv(argv);
     }
 
@@ -69,7 +68,15 @@ public class CommandLineBase {
 
         boolean positional = false;
 
+        if (null == argv) {
+            return argList;
+        }
+
         for ( String anArgv : argv ) {
+            if (null == anArgv) {
+                continue;
+            }
+
             String argStr = anArgv;
 
             if ( positional || !argStr.startsWith("-") ) {

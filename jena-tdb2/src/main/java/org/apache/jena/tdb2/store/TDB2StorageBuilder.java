@@ -31,7 +31,6 @@ import org.apache.jena.dboe.base.record.RecordFactory;
 import org.apache.jena.dboe.index.Index;
 import org.apache.jena.dboe.index.RangeIndex;
 import org.apache.jena.dboe.storage.DatabaseRDF;
-import org.apache.jena.dboe.storage.StoragePrefixes;
 import org.apache.jena.dboe.sys.Names;
 import org.apache.jena.dboe.trans.bplustree.BPlusTree;
 import org.apache.jena.dboe.trans.bplustree.BPlusTreeFactory;
@@ -95,7 +94,7 @@ public class TDB2StorageBuilder {
 
         TDB2StorageBuilder builder = new TDB2StorageBuilder(txnSystem, location, params, new ComponentIdMgr(UUID.randomUUID()));
         StorageTDB storage = builder.buildStorage();
-        StoragePrefixes prefixes = builder.buildPrefixes();
+        StoragePrefixesTDB prefixes = builder.buildPrefixes();
 
         // Finalize.
         builder.components.forEach(txnCoord::add);
@@ -193,7 +192,7 @@ public class TDB2StorageBuilder {
         return dsg;
     }
 
-    private StoragePrefixes buildPrefixes() {
+    private StoragePrefixesTDB buildPrefixes() {
         NodeTable nodeTablePrefixes = buildNodeTable(params.getPrefixTableBaseName(), false);
         StoragePrefixesTDB prefixes = buildPrefixTable(nodeTablePrefixes);
         return prefixes;
@@ -286,10 +285,8 @@ public class TDB2StorageBuilder {
 
         nodeTable = addNodeTableCache(nodeTable, params, isData);
 
-        if ( nodeTable instanceof NodeTableCache ) {
-            NodeTableCache nodeTableCache = (NodeTableCache)nodeTable;
+        if ( nodeTable instanceof NodeTableCache nodeTableCache)
             listeners.add(nodeTableCache);
-        }
 
         nodeTable = NodeTableInline.create(nodeTable);
         return nodeTable;
@@ -299,7 +296,9 @@ public class TDB2StorageBuilder {
         int nodeToIdCacheSize   = isData ? params.getNode2NodeIdCacheSize() : params.getPrefixNode2NodeIdCacheSize();
         int idToNodeCacheSize   = isData ? params.getNodeId2NodeCacheSize() : params.getPrefixNodeId2NodeCacheSize();
         int missCacheSize       = isData ? params.getNodeMissCacheSize()    : params.getPrefixNodeMissCacheSize();
-        nodeTable = NodeTableCache.create(nodeTable, nodeToIdCacheSize, idToNodeCacheSize, missCacheSize);
+        double nodeCacheInitialCapacityFactor = params.getNodeCacheInitialCapacityFactor();
+        nodeTable = NodeTableCache.create(nodeTable, nodeToIdCacheSize, idToNodeCacheSize, missCacheSize,
+                nodeCacheInitialCapacityFactor);
         return nodeTable;
     }
 

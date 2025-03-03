@@ -40,11 +40,6 @@ public class Chars
         '9' , 'a' , 'b' , 'c' , 'd' , 'e' , 'f' };
 
 
-//         , 'g' , 'h' ,
-//        'i' , 'j' , 'k' , 'l' , 'm' , 'n' ,
-//        'o' , 'p' , 'q' , 'r' , 's' , 't' ,
-//        'u' , 'v' , 'w' , 'x' , 'y' , 'z'
-
     public static final Charset charsetUTF8 = StandardCharsets.UTF_8;
     public static final Charset charsetASCII = StandardCharsets.US_ASCII;
 
@@ -182,20 +177,22 @@ public class Chars
     // REPLACEMENT CHARACTER
     public static final char REPLACEMENT     = 0xFFFD ;
 
-    // Not a character
+    // "Not a character" - a Unicode non-character codepoint that is not legal in UTF-8.
     public static final char NotACharacter   = 0xFFFF ;
-    // Detect byte order by contrast (BOM reversed).
+    // Detect byte order by contrast (BOM reversed) - a Unicode non-character codepoint that is not legal in UTF-8.
     public static final char ReverseOrderBOM = 0xFFFE ;
 
     /** Undefined character (exact meaning depends on use) - not a Unicode codepoint */
     public static final int  UNSET           =  -2 ;
-    public static final char NL              = '\n' ;
-    public static final char LF              = NL ;     // Alt name.
-    public static final char CR              = '\r' ;
-    public static final char TAB             = '\t' ;
-    public static final char FF              = '\f' ;   // Form feed
-    public static final char SPC             = ' ' ;
-    public static final char BSPACE          = '\b' ;
+    public static final char NL              = '\n' ;       // U+000A
+    public static final char LF              = NL ;         // U+000A - alternative name
+    public static final char CR              = '\r' ;       // U+000D
+    public static final char TAB             = '\t' ;       // U+0009
+    public static final char FF              = '\f' ;       // U+000B - Form feed
+    public static final char VT              = '\u000B' ;   // U+000C - Vertical tab
+    public static final char SPC             = ' ' ;        // U+0020
+    public static final char BSPACE          = '\b' ;       // U+0008 - Backspace
+    public static final char DEL             = '\u007F' ;   // U+0008 - Delete
 
     public static final char CH_ZERO         =  (char)0 ;
 
@@ -234,10 +231,15 @@ public class Chars
     public static final char CH_RSLASH       = '\\' ;
     public static final char CH_PERCENT      = '%' ;
     public static final char CH_VBAR         = '|' ;
+    public static final char CH_TILDE        = '~' ;
 
-    // Byte versions of the above
+    // Byte versions of some of the above
     public static final byte B_NL            = NL ;
+    public static final byte B_LF            = LF ;
     public static final byte B_CR            = CR ;
+    public static final byte B_FF            = FF ;
+    public static final byte B_VT            = VT ;
+    public static final byte B_SPC           = SPC ;
 
     public static final byte B_LBRACKET      = '[' ;
     public static final byte B_RBRACKET      = ']' ;
@@ -272,6 +274,7 @@ public class Chars
     public static final byte B_RSLASH        = '\\' ;
     public static final byte B_PERCENT       = '%' ;
     public static final byte B_VBAR          = '|' ;
+    public static final byte B_TILDE         = '~' ;
 
     // String versions - a few compound "chars" as well.
     public static final String S_LBRACKET     = "[" ;
@@ -309,5 +312,5 @@ public class Chars
     public static final String S_RSLASH       = "\\" ;
     public static final String S_PERCENT      = "%" ;
     public static final String S_VBAR         = "|" ;
-
+    public static final String S_TILDE         = "~" ;
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.jena.atlas.logging.Log;
-import org.apache.jena.query.Dataset;
-import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.graph.Node;
+import org.apache.jena.sparql.core.DatasetGraph;
 
 /**
  * Record of datasets created from descriptions.
@@ -33,20 +33,20 @@ import org.apache.jena.rdf.model.Resource;
  * corresponds to one dataset object when multiple services refer to the
  * same dataset.
  */
-public class DatasetDescriptionMap  {
+public class DatasetDescriptionMap {
 
-	private Map<Resource, Dataset> map = new HashMap<>();
+	private Map<Node, DatasetGraph> map = new HashMap<>();
 
 	public DatasetDescriptionMap() {}
 
-    public void register(Resource node, Dataset ds) {
-        Dataset dsCurrent = map.get(node);
+    public void register(Node node, DatasetGraph ds) {
+        DatasetGraph dsCurrent = map.get(node);
         if ( dsCurrent != null && ! dsCurrent.equals(ds) )
             Log.warn(this.getClass(), "Replacing registered dataset for "+node);
         map.put(node, ds);
     }
 
-    public Dataset get(Resource node) {
+    public DatasetGraph get(Node node) {
         return map.get(node);
     }
 

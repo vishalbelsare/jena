@@ -5,9 +5,9 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,13 +18,11 @@
 package org.apache.jena.ext.xerces.impl.dv.xs;
 
 import org.apache.jena.ext.xerces.impl.dv.InvalidDatatypeValueException;
-import org.apache.jena.ext.xerces.impl.dv.ValidationContext;
-import org.apache.jena.ext.xerces.xs.datatypes.XSFloat;
 
 /**
  * Represent the schema type "float"
  *
- * {@literal @xerces.internal} 
+ * {@literal @xerces.internal}
  *
  * @author Neeraj Bajaj, Sun Microsystems, inc.
  * @author Sandy Gao, IBM
@@ -35,12 +33,12 @@ public class FloatDV extends TypeValidator {
 
     @Override
     public short getAllowedFacets(){
-        return ( XSSimpleTypeDecl.FACET_PATTERN | XSSimpleTypeDecl.FACET_WHITESPACE | XSSimpleTypeDecl.FACET_ENUMERATION |XSSimpleTypeDecl.FACET_MAXINCLUSIVE |XSSimpleTypeDecl.FACET_MININCLUSIVE | XSSimpleTypeDecl.FACET_MAXEXCLUSIVE  | XSSimpleTypeDecl.FACET_MINEXCLUSIVE  );
+        return ( XSSimpleTypeDecl.FACET_PATTERN | XSSimpleTypeDecl.FACET_WHITESPACE | XSSimpleTypeDecl.FACET_MAXINCLUSIVE |XSSimpleTypeDecl.FACET_MININCLUSIVE | XSSimpleTypeDecl.FACET_MAXEXCLUSIVE  | XSSimpleTypeDecl.FACET_MINEXCLUSIVE  );
     }//getAllowedFacets()
 
     //convert a String to Float form, we have to take care of cases specified in spec like INF, -INF and NaN
     @Override
-    public Object getActualValue(String content, ValidationContext context) throws InvalidDatatypeValueException {
+    public Object getActualValue(String content) throws InvalidDatatypeValueException {
         try{
             return new XFloat(content);
         } catch (NumberFormatException ex){
@@ -53,18 +51,8 @@ public class FloatDV extends TypeValidator {
     public int compare(Object value1, Object value2){
         return ((XFloat)value1).compareTo((XFloat)value2);
     }//compare()
-    
-    //distinguishes between identity and equality for float datatype
-    //0.0 is equal but not identical to -0.0
-    @Override
-    public boolean isIdentical (Object value1, Object value2) {  	 	
-        if (value2 instanceof XFloat) {
-            return ((XFloat)value1).isIdentical((XFloat)value2);
-        }
-        return false;
-    }//isIdentical()
 
-    private static final class XFloat implements XSFloat {
+    private static final class XFloat {
 
         private final float value;
         public XFloat(String s) throws NumberFormatException {
@@ -72,6 +60,10 @@ public class FloatDV extends TypeValidator {
                 value = Float.parseFloat(s);
             }
             else if ( s.equals("INF") ) {
+                value = Float.POSITIVE_INFINITY;
+            }
+            // XSD Schema datatypes 1.1 (not 1.0)
+            else if ( s.equals("+INF") ) {
                 value = Float.POSITIVE_INFINITY;
             }
             else if ( s.equals("-INF") ) {
@@ -103,28 +95,11 @@ public class FloatDV extends TypeValidator {
 
             return false;
         }
-        
+
         @Override
         public int hashCode() {
             // This check is necessary because floatToIntBits(+0) != floatToIntBits(-0)
             return (value == 0f) ? 0 : Float.floatToIntBits(value);
-        }
-        
-        // NOTE: 0.0 is equal but not identical to -0.0
-        public boolean isIdentical (XFloat val) {
-            if (val == this) {
-                return true;
-            }
-            
-            if (value == val.value) {
-                return (value != 0.0f || 
-                    (Float.floatToIntBits(value) == Float.floatToIntBits(val.value)));
-            }
-            
-            if (value != value && val.value != val.value)
-                return true;
-
-            return false;
         }
 
         private int compareTo(XFloat val) {
@@ -142,7 +117,7 @@ public class FloatDV extends TypeValidator {
                 return 0;
 
             // one of the 2 values or both is/are NaN(s)
-            
+
             if (value != value) {
                 // this = NaN = other
                 if (oval != oval)
@@ -157,7 +132,17 @@ public class FloatDV extends TypeValidator {
 
         private String canonical;
         @Override
-        public synchronized String toString() {
+        public String toString() {
+            if ( canonical == null ) {
+                synchronized (this) {
+                    if ( canonical == null )
+                        setCanonical();
+                }
+            }
+            return canonical;
+        }
+
+        private void setCanonical() {
             if (canonical == null) {
                 if (value == Float.POSITIVE_INFINITY)
                     canonical = "INF";
@@ -235,12 +220,6 @@ public class FloatDV extends TypeValidator {
                     }
                 }
             }
-            return canonical;
-        }
-        
-        @Override
-        public float getValue() {
-            return value;
         }
     }
 } // class FloatDV

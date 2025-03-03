@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,17 +18,18 @@
 
 package org.apache.jena.riot.system;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-import org.junit.runners.Suite.SuiteClasses;
+// Test classes get missed
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
+@Suite
+@SelectClasses({
 
-/**
- * Test suite for RIOT system
- *
- */
-@RunWith(Suite.class)
-@SuiteClasses({
-    TestChecker.class
+//import org.junit.runner.RunWith;
+//import org.junit.runners.Suite;
+//import org.junit.runners.Suite.SuiteClasses;
+//@RunWith(Suite.class)
+//@SuiteClasses({
+      TestChecker.class
     , TestStreamRDF.class
     , TestFactoryRDF.class
     , TestFactoryRDFCaching.class
@@ -45,10 +46,13 @@ import org.junit.runners.Suite.SuiteClasses;
     , TestFormatRegistration.class
     , TestJsonLDReadWrite.class         // Some simple testing of the jsonld-java engine.
     , TestSerializable.class
-    , TestIRIxRIOT.class
+
     , TestRiotLib.class
     , TestAsyncParser.class
 })
 
+/**
+ * Test suite for RIOT system
+ */
 public class TS_RiotSystem
 {}

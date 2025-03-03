@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,27 +23,24 @@ import static org.apache.jena.fuseki.validation.json.ValidatorJsonLib.jErrors;
 import static org.apache.jena.fuseki.validation.json.ValidatorJsonLib.jWarnings;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.apache.jena.atlas.json.JsonBuilder;
 import org.apache.jena.atlas.json.JsonObject;
 import org.apache.jena.fuseki.servlets.ServletOps;
-import org.apache.jena.iri.IRI;
-import org.apache.jena.iri.IRIFactory;
-import org.apache.jena.iri.Violation;
-import org.apache.jena.irix.SetupJenaIRI;
+import org.apache.jena.iri3986.provider.IRIProvider3986;
+import org.apache.jena.irix.IRIException;
+import org.apache.jena.irix.IRIProvider;
+import org.apache.jena.irix.IRIx;
 
 public class IRIValidatorJSON {
 
     public IRIValidatorJSON() { }
 
-    static IRIFactory iriFactory = SetupJenaIRI.iriCheckerFactory();
-
     static final String paramIRI           = "iri";
 
     // Output is an object  { "iris" : [ ] }
-    // { "iri": "" , "error": [], "warnings": [] }
+    // with array entries   { "iri": "" , "error": [], "warnings": [] }
     static final String jIRIs    = "iris";
     static final String jIRI     = "iri";
 
@@ -52,34 +49,36 @@ public class IRIValidatorJSON {
         obj.startObject();
 
         String args[] = getArgs(action, paramIRI);
-        if ( args.length == 0 )
+        if ( args == null || args.length == 0 ) {
             ServletOps.errorBadRequest("No IRIs supplied");
+            return null;
+        }
 
         obj.key(jIRIs);
         obj.startArray();
 
+        IRIProvider provider = new IRIProvider3986();
+
         for ( String iriStr : args ) {
             obj.startObject();
             obj.key(jIRI).value(iriStr);
-
-            IRI iri = iriFactory.create(iriStr);
-
             List<String> errors = new ArrayList<>();
             List<String> warnings = new ArrayList<>();
-
-            if ( iri.isRelative() )
-                warnings.add("Relative IRI: " + iriStr);
-
-            Iterator<Violation> vIter = iri.violations(true);
-            for (; vIter.hasNext(); ) {
-                Violation v = vIter.next();
-                String str = v.getShortMessage();
-                if ( v.isError() )
-                    errors.add(str);
-                else
-                    warnings.add(str);
+            try {
+                IRIx iri = provider.create(iriStr);
+                System.out.println(iriStr + " ==> " + iri);
+                if ( iri.isRelative() )
+                    if ( iri.isRelative() )
+                        warnings.add("Relative IRI: " + iriStr);
+                iri.handleViolations((error,msg)->{
+                    if ( error )
+                        errors.add(msg);
+                    else
+                        warnings.add(msg);
+                });
+            } catch (IRIException ex) {
+                errors.add("Bad IRI: "+ex.getMessage());
             }
-
             obj.key(jErrors);
             obj.startArray();
             for ( String msg : errors )
@@ -94,10 +93,7 @@ public class IRIValidatorJSON {
 
             obj.finishObject();
         }
-
-
-       obj.finishArray();
-
+        obj.finishArray();
         obj.finishObject();
         return obj.build().getAsObject();
     }
