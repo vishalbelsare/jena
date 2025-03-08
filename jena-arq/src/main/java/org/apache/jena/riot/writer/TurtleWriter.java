@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.jena.riot.writer ;
+package org.apache.jena.riot.writer;
 
-import org.apache.jena.atlas.io.IndentedWriter ;
-import org.apache.jena.graph.Graph ;
-import org.apache.jena.riot.system.PrefixMap ;
-import org.apache.jena.sparql.util.Context ;
+import org.apache.jena.atlas.io.IndentedWriter;
+import org.apache.jena.graph.Graph;
+import org.apache.jena.riot.system.PrefixMap;
+import org.apache.jena.sparql.util.Context;
 
 public class TurtleWriter extends TurtleWriterBase {
 

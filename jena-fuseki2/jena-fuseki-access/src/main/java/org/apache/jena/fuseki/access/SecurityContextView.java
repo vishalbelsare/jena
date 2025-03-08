@@ -26,14 +26,12 @@ import java.util.function.Predicate;
 
 import org.apache.jena.graph.Node;
 import org.apache.jena.query.Query;
-import org.apache.jena.query.QueryExecution;
-import org.apache.jena.query.QueryExecutionFactory;
-import org.apache.jena.query.QueryFactory;
 import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sparql.core.Quad;
+import org.apache.jena.sparql.exec.QueryExec;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.sparql.util.NodeUtils;
-import org.apache.jena.tdb.TDBFactory;
+import org.apache.jena.tdb1.TDB1Factory;
 import org.apache.jena.tdb2.DatabaseMgr;
 
 /** A {@link SecurityContextView} is the things actor (user, role) is allowed to do.
@@ -87,28 +85,23 @@ public class SecurityContextView implements SecurityContext {
     }
 
     @Override
-    public QueryExecution createQueryExecution(String queryString, DatasetGraph dsg) {
-        return createQueryExecution(QueryFactory.create(queryString), dsg);
-    }
-
-    @Override
-    public QueryExecution createQueryExecution(Query query, DatasetGraph dsg) {
+    public QueryExec createQueryExec(Query query, DatasetGraph dsg) {
         if ( isAccessControlledTDB(dsg) ) {
-            QueryExecution qExec = QueryExecutionFactory.create(query, dsg);
+            QueryExec qExec = QueryExec.dataset(dsg).query(query).build();
             filterTDB(dsg, qExec);
             return qExec;
         }
         // Not TDB - do by selecting graphs.
         DatasetGraph dsgA = DataAccessCtl.filteredDataset(dsg, this);
-        return QueryExecutionFactory.create(query, dsgA);
+        return QueryExec.dataset(dsgA).query(query).build();
     }
 
     /**
      * Apply a filter suitable for the TDB-backed {@link DatasetGraph}, to the {@link Context} of the
-     * {@link QueryExecution}. This does not modify the {@link DatasetGraph}.
+     * {@link QueryExec}. This does not modify the {@link DatasetGraph}.
      */
     @Override
-    public void filterTDB(DatasetGraph dsg, QueryExecution qExec) {
+    public void filterTDB(DatasetGraph dsg, QueryExec qExec) {
         GraphFilter<?> predicate = predicate(dsg);
         qExec.getContext().set(predicate.getContextKey(), predicate);
     }
@@ -142,7 +135,7 @@ public class SecurityContextView implements SecurityContext {
         dsg = DatasetGraphAccessControl.removeWrapper(dsg);
         // dsg has to be the database dataset, not wrapped.
         //  DatasetGraphSwitchable is wrapped but should not be unwrapped.
-        if ( TDBFactory.isTDB1(dsg) )
+        if ( TDB1Factory.isTDB1(dsg) )
             return GraphFilterTDB1.graphFilter(dsg, graphNames, matchDefaultGraph);
         if ( DatabaseMgr.isTDB2(dsg) )
             return GraphFilterTDB2.graphFilter(dsg, graphNames, matchDefaultGraph);
@@ -153,7 +146,7 @@ public class SecurityContextView implements SecurityContext {
         DatasetGraph dsgBase = DatasetGraphAccessControl.unwrapOrNull(dsg);
         if ( dsgBase == null )
             return false;
-        if ( TDBFactory.isTDB1(dsgBase) )
+        if ( TDB1Factory.isTDB1(dsgBase) )
             return true;
         if ( DatabaseMgr.isTDB2(dsgBase) )
             return true;

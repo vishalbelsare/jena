@@ -27,12 +27,12 @@ import java.util.ArrayList ;
 import java.util.List ;
 
 import junit.framework.TestCase ;
-import org.apache.jena.graph.Factory ;
+import org.apache.jena.graph.GraphMemFactory ;
 import org.apache.jena.graph.Graph ;
 import org.apache.jena.rdf.model.* ;
 import org.apache.jena.rdf.model.impl.PropertyImpl ;
 import org.apache.jena.rdf.model.impl.ResourceImpl ;
-import org.apache.jena.rdfxml.xmlinput.ARPTests ;
+import org.apache.jena.rdfxml.xmlinput1.ARPTests;
 import org.apache.jena.reasoner.InfGraph ;
 import org.apache.jena.reasoner.Reasoner ;
 import org.apache.jena.reasoner.ReasonerFactory ;
@@ -195,7 +195,7 @@ public class WGReasonerTester {
             String fileName = test.getRequiredProperty(predicate).getObject().toString();
             return loadFile(fileName).getGraph();
         } else {
-            return Factory.createGraphMem();
+            return GraphMemFactory.createGraphMem();
         }
     }
 

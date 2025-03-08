@@ -205,6 +205,17 @@ public class TestExpressions
     @Test(expected=ExprEvalException.class)
     public void boolean_74()       { testBoolean("isNumeric(?x)", true) ; }
 
+    // 24:00:00
+    // Equal
+    static String dateTime1999_24 = "'1999-12-31T24:00:00Z'^^<"+XSDDatatype.XSDdateTime.getURI()+">" ;
+    static String dateTime2000_00 = "'2000-01-01T00:00:00Z'^^<"+XSDDatatype.XSDdateTime.getURI()+">" ;
+
+    static String time_24 = "'24:00:00'^^<"+XSDDatatype.XSDtime.getURI()+">" ;
+    static String time_00 = "'00:00:00'^^<"+XSDDatatype.XSDtime.getURI()+">" ;
+
+    @Test public void dateTime24_01() { testBoolean(dateTime1999_24+" = "+dateTime2000_00 , true) ; }
+    @Test public void time24_01()     { testBoolean(time_24+" = "+time_00 , true) ; }
+
     static String duration1 =  "'P1Y1M1DT1H1M1S"+"'^^<"+XSDDatatype.XSDduration.getURI()+">";
     static String duration2 =  "'P2Y1M1DT1H1M1S"+"'^^<"+XSDDatatype.XSDduration.getURI()+">";
     static String duration3 =  "'P1Y1M1DT1H1M1S"+"'^^<"+XSDDatatype.XSDduration.getURI()+">";
@@ -346,9 +357,29 @@ public class TestExpressions
     @Test public void boolean_126() { testBoolean("datatype('fred') = <"+XSD.xstring.getURI()+">", true) ; }
     @Test public void boolean_127() { testBoolean("datatype('fred'^^<urn:test:foo>) = <urn:test:foo>", true) ; }
     @Test public void boolean_128() { testBoolean("datatype('fred'^^<foo>) = <Foo>", false) ; }
-    @Test public void string_15() { testString("lang('fred'@en)", "en") ; }
-    @Test public void string_16() { testString("lang('fred'@en-uk)", "en-uk") ; }
-    @Test public void string_17() { testString("lang('fred')", "") ; }
+
+    @Test public void lang_01() { testString("LANG('tea time'@en)", "en") ; }
+    // Aside For some strange reason, the language code is GB not UK.
+    // The state is UK! "The United Kingdom of Great Britain and Norther Ireland."
+    // The four countries England, Scotland, Wales and Northern Ireland (since 1922).
+    // It's complicated: https://en.wikipedia.org/wiki/United_Kingdom
+    @Test public void lang_02() { testString("LANG('tea time'@en-gb)", "en-GB") ; }
+    @Test public void lang_03() { testString("LANG('tea time')", "") ; }
+
+    @Test public void langmatches_01() { testBoolean("LANGMATCHES('EN', 'en')", true) ; }
+    @Test public void langmatches_02() { testBoolean("LANGMATCHES('en', 'en')", true) ; }
+    @Test public void langmatches_03() { testBoolean("LANGMATCHES('EN', 'EN')", true) ; }
+    @Test public void langmatches_04() { testBoolean("LANGMATCHES('en', 'EN')", true) ; }
+    @Test public void langmatches_05() { testBoolean("LANGMATCHES('fr', 'EN')", false) ; }
+
+    @Test public void langmatches_06() { testBoolean("LANGMATCHES('en', 'en-gb')", false) ; }
+    @Test public void langmatches_07() { testBoolean("LANGMATCHES('en-GB', 'en-GB')", true) ; }
+    @Test public void langmatches_08() { testBoolean("LANGMATCHES('en-Latn-gb', 'en-Latn')", true) ; }
+    @Test public void langmatches_09() { testBoolean("LANGMATCHES('en-gb', 'en-Latn')", false) ; }
+
+    @Test public void langmatches_10() { testBoolean("LANGMATCHES('', '*')", false) ; }
+    @Test public void langmatches_11() { testBoolean("LANGMATCHES('en-us', '*')", true) ; }
+
     @Test public void boolean_129() { testBoolean("isURI(?x)", true, env) ; }
     @Test public void boolean_130() { testBoolean("isURI(?a)", false, env) ; }
     @Test public void boolean_131() { testBoolean("isURI(?b)", false, env) ; }
@@ -398,6 +429,7 @@ public class TestExpressions
     static String dateTime3 = "'2005-01-01T12:03:34Z'^^<"+XSDDatatype.XSDdateTime.getURI()+">" ;
     // Later
     static String dateTime4 = "'2005-02-25T13:00:00Z'^^<"+XSDDatatype.XSDdateTime.getURI()+">" ;
+
     static String time1 = "'12:03:34Z'^^<" + XSDDatatype.XSDtime.getURI() + ">";
     static String time2 = "'12:03:34Z'^^<" + XSDDatatype.XSDtime.getURI() + ">";
     static String time3 = "'13:00:00Z'^^<" + XSDDatatype.XSDtime.getURI() + ">";
@@ -419,7 +451,7 @@ public class TestExpressions
         query.setPrefix("select",  selNS) ;
     }
     static String xsd = XSDDatatype.XSD+"#" ;
-    static Binding env = BindingFactory.binding(Var.alloc("a"), NodeFactory.createLiteral("A"),
+    static Binding env = BindingFactory.binding(Var.alloc("a"), NodeFactory.createLiteralString("A"),
                                                 Var.alloc("b"), NodeFactory.createBlankNode(),
                                                 Var.alloc("x"), NodeFactory.createURI("urn:ex:abcd")) ;
 

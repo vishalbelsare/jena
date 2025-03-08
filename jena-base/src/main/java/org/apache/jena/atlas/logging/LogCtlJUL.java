@@ -22,6 +22,7 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Level;
@@ -53,6 +54,32 @@ public class LogCtlJUL {
 
     private LogCtlJUL() {}
 
+    /*package*/ static String getLevelJUL(String logger) {
+        java.util.logging.Level level = java.util.logging.Logger.getLogger(logger).getLevel();
+        if ( level == null )
+            return null;
+        if ( level == java.util.logging.Level.SEVERE )
+            return "ERROR";
+        return level.getName();
+    }
+
+    /*package*/ static void setLevelJUL(String logger, String levelName) {
+        java.util.logging.Level level = java.util.logging.Level.ALL;
+        if ( levelName == null )
+            level = null;
+        else if ( levelName.equalsIgnoreCase("info") )
+            level = java.util.logging.Level.INFO;
+        else if ( levelName.equalsIgnoreCase("debug") )
+            level = java.util.logging.Level.FINE;
+        else if ( levelName.equalsIgnoreCase("warn") || levelName.equalsIgnoreCase("warning") )
+            level = java.util.logging.Level.WARNING;
+        else if ( levelName.equalsIgnoreCase("error") || levelName.equalsIgnoreCase("severe") )
+            level = java.util.logging.Level.SEVERE;
+        else if ( levelName.equalsIgnoreCase("OFF") )
+            level = java.util.logging.Level.OFF;
+        java.util.logging.Logger.getLogger(logger).setLevel(level);
+    }
+
     /**
      * Reset java.util.logging - this overrides the previous configuration, if any.
      */
@@ -69,7 +96,13 @@ public class LogCtlJUL {
 
     static void readJavaLoggingConfiguration(InputStream details) throws Exception {
         System.setProperty(JUL_PROPERTY, "set");
-        java.util.logging.LogManager.getLogManager().readConfiguration(details);
+        java.util.logging.LogManager logManager = java.util.logging.LogManager.getLogManager();
+        // Calling .reset, stops the ConsoleHandler closing System.err.
+        // readConfiguration (or updateConfiguration) will shutdown cleanly and ConsoleHandler.close is called.
+        // That calls System.err.close()
+        // See ConsoleHandlerStream in this package, a variant that does not close the PrintStream.
+        logManager.reset();
+        logManager.readConfiguration(details);
     }
 
     private static boolean setJavaLoggingClasspath(String resourceName) {
@@ -99,7 +132,7 @@ public class LogCtlJUL {
 
     public static void setJavaLoggingDft() {
         try {
-            InputStream details = new ByteArrayInputStream(defaultProperties.getBytes("UTF-8"));
+            InputStream details = new ByteArrayInputStream(defaultProperties.getBytes(StandardCharsets.UTF_8));
             readJavaLoggingConfiguration(details);
         } catch (Exception ex) {
             throw new AtlasException(ex);

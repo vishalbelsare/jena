@@ -24,6 +24,7 @@ import org.apache.jena.atlas.lib.Lib ;
 import org.apache.jena.graph.Node ;
 import org.apache.jena.graph.Triple ;
 import org.apache.jena.sparql.algebra.Op ;
+import org.apache.jena.sparql.algebra.OpLib;
 import org.apache.jena.sparql.algebra.OpVars ;
 import org.apache.jena.sparql.algebra.TransformCopy ;
 import org.apache.jena.sparql.algebra.op.* ;
@@ -665,7 +666,7 @@ public class TransformFilterPlacement extends TransformCopy {
 
         if ( false ) {
             // Push everything, always
-            // Left as a safty fall back.
+            // Left as a safety fall back.
             List<Op> x = new ArrayList<>() ;
             input.getElements().forEach(op->{
                 Placement p = transform(exprs, op) ;
@@ -682,7 +683,6 @@ public class TransformFilterPlacement extends TransformCopy {
         // Don't push any expressions that aren't used in any of the arms of the disjunction.
         // This is more about being tidy.
         List<Expr> unplaced = new ArrayList<>(exprs.getList()) ;
-        //List<Placement> x = input.getElements().stream().map(op->transform(exprs, op)).collect(Collectors.toList()) ;
         List<Placement> placements = new ArrayList<>(exprs.size()) ;
         Boolean someChange = Boolean.FALSE ;
         for ( Op op : input.getElements() ) {
@@ -851,7 +851,7 @@ public class TransformFilterPlacement extends TransformCopy {
             Set<Var> exprVars = expr.getVarsMentioned() ;
             if ( patternVarsScope.containsAll(exprVars) ) {
                 if ( op == null )
-                    op = OpTable.unit() ;
+                    op = OpLib.unit() ;
                 op = OpFilter.filter(expr, op) ;
                 iter.remove() ;
             }
@@ -878,7 +878,7 @@ public class TransformFilterPlacement extends TransformCopy {
 
         for ( Expr expr : exprs ) {
             if ( op == null )
-                op = OpTable.unit() ;
+                op = OpLib.unit() ;
             op = OpFilter.filter(expr, op) ;
         }
         return op ;

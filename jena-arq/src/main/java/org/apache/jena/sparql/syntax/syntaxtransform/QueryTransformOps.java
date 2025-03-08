@@ -18,50 +18,111 @@
 
 package org.apache.jena.sparql.syntax.syntaxtransform;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryVisitor;
 import org.apache.jena.query.SortCondition;
-import org.apache.jena.rdf.model.Literal ;
-import org.apache.jena.rdf.model.RDFNode ;
-import org.apache.jena.rdf.model.Resource ;
+import org.apache.jena.rdf.model.Literal;
+import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.shared.JenaException;
 import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.shared.impl.PrefixMappingImpl;
 import org.apache.jena.sparql.ARQException;
 import org.apache.jena.sparql.core.*;
-import org.apache.jena.sparql.expr.Expr;
-import org.apache.jena.sparql.expr.ExprTransform;
-import org.apache.jena.sparql.expr.ExprTransformer;
-import org.apache.jena.sparql.expr.ExprVar;
+import org.apache.jena.sparql.expr.*;
 import org.apache.jena.sparql.graph.NodeTransform;
 import org.apache.jena.sparql.modify.request.QuadAcc;
 import org.apache.jena.sparql.syntax.*;
 
 /** Support for transformation of query abstract syntax. */
 public class QueryTransformOps {
-    /** Transform a query based on a mapping from {@link Var} variable to replacement {@link Node}. */
+
+    /**
+     * Replace variables in a query by RDF terms.
+     * The replacements are added to the return queries SELECT clause (if a SELECT query).
+     *
+     * @throws QueryScopeException if the query contains variables used in a
+     *   way that does not allow substitution (.e.g {@code AS ?var} or used in
+     *   {@code VALUES}).
+     *
+     *  @see #replaceVars(Query, Map) to replace variables without adding the replacements to the SELECT clause.
+     */
+    public static Query syntaxSubstitute(Query input, Map<Var, ? extends Node> substitutions) {
+        Query query2 = transformSubstitute(input, substitutions);
+        // Include substitutions
+        if ( input.isSelectType() ) {
+            query2.setQueryResultStar(false);
+            List<Var> projectVars = query2.getProjectVars();
+            substitutions.forEach((v, n) -> {
+                if ( ! projectVars.contains(v) ) {
+                    var nv = NodeValue.makeNode(n);
+                    query2.getProject().update(v, NodeValue.makeNode(n));
+                }
+            });
+        }
+        return query2;
+    }
+
+    /** @deprecated Use {@link #replaceVars} */
+    @Deprecated
     public static Query transform(Query query, Map<Var, ? extends Node> substitutions) {
-        ElementTransform eltrans = new ElementTransformSubst(substitutions);
-        NodeTransform nodeTransform = new NodeTransformSubst(substitutions);
-        ExprTransform exprTrans = new ExprTransformNodeElement(nodeTransform, eltrans);
-        return transform(query, eltrans, exprTrans);
+        return replaceVars(query, substitutions);
+    }
+
+    /**
+     * Transform a query based on a mapping from {@link Var} variable to replacement {@link Node}.
+     * The replacement can be a constant or another variable.
+     * This operation does not record the substitution made.
+     *
+     * See {@link #syntaxSubstitute(Query,Map)}
+     * @throws QueryScopeException if the query contains variables used in a
+     *   way that does not allow constant substitution.
+     */
+    public static Query replaceVars(Query query, Map<Var, ? extends Node> substitutions) {
+        return transformSubstitute(query, substitutions);
+    }
+
+    /** @deprecated Use {@link #queryReplaceVars} */
+    @Deprecated
+    public static Query transformQuery(Query query, Map<String, ? extends RDFNode> substitutions)    {
+        return queryReplaceVars(query, substitutions);
     }
 
     /**
      * Transform a query based on a mapping from variable name to replacement
      * {@link RDFNode} (a {@link Resource} (or blank node) or a {@link Literal}).
      */
-    public static Query transformQuery(Query query, Map<String, ? extends RDFNode> substitutions) {
+    public static Query queryReplaceVars(Query query, Map<String, ? extends RDFNode> substitutions) {
         // Must have a different name because of Java's erasure of parameterised types.
         Map<Var, Node> map = TransformElementLib.convert(substitutions);
-        return transform(query, map);
+        return replaceVars(query, map);
+    }
+
+    private static Query transformSubstitute(Query query, Map<Var, ? extends Node> substitutions) {
+        // Those variables that are mapped to constants, not variables.
+        // Replacing a variable by another variable is always possible - no scoping issues.
+        Set<Var> varsForConst = new HashSet<>();
+        substitutions.forEach((var,node) -> {
+          if (! ( node instanceof Var ) )
+              varsForConst.add(var);
+        });
+        QuerySyntaxSubstituteScope.scopeCheck(query, varsForConst);
+
+        ElementTransform eltrans = new ElementTransformSubst(substitutions);
+        NodeTransform nodeTransform = new NodeTransformSubst(substitutions);
+        ExprTransform exprTrans = new ExprTransformNodeElement(nodeTransform, eltrans);
+        return transform(query, eltrans, exprTrans);
+    }
+
+    // ----------------
+
+    public static Query transform(Query query, ElementTransform transform) {
+        ExprTransform noop = new ExprTransformApplyElementTransform(transform);
+        return transform(query, transform, noop);
     }
 
     /**
@@ -71,8 +132,7 @@ public class QueryTransformOps {
     public static Query transform(Query query, ElementTransform transform, ExprTransform exprTransform) {
         Query q2 = QueryTransformOps.shallowCopy(query);
         // Mutate the q2 structures which are already allocated and no other code can access yet.
-
-        mutateByQueryType(q2, transform, exprTransform);
+        mutateByQueryType(q2, exprTransform);
         mutateVarExprList(q2.getGroupBy(), exprTransform);
         mutateExprList(q2.getHavingExprs(), exprTransform);
         if (q2.getOrderBy() != null)
@@ -82,6 +142,7 @@ public class QueryTransformOps {
             // Reset internal to only what now can be seen.
             q2.resetResultVars();
         }
+        setAggregators(q2, query, exprTransform);
         return q2;
     }
 
@@ -111,8 +172,14 @@ public class QueryTransformOps {
         }
     }
 
+    private static void setAggregators(Query newQuery, Query query, ExprTransform exprTransform) {
+        for (ExprAggregator aggregator : query.getAggregators()) {
+            newQuery.getAggregators().add((ExprAggregator) exprTransform.transform(aggregator));
+        }
+    }
+
     // Do the result form part of the cloned query.
-    private static void mutateByQueryType(Query q2, ElementTransform transform, ExprTransform exprTransform) {
+    private static void mutateByQueryType(Query q2, ExprTransform exprTransform) {
         switch(q2.queryType()) {
             case ASK : break;
             case CONSTRUCT :
@@ -121,11 +188,11 @@ public class QueryTransformOps {
                 Template template = q2.getConstructTemplate();
                 QuadAcc acc = new QuadAcc();
                 List<Quad> quads = template.getQuads();
-                template.getQuads().forEach(q->{
-                    Node g = transform(q.getGraph(), exprTransform);
-                    Node s = transform(q.getSubject(), exprTransform);
-                    Node p = transform(q.getPredicate(), exprTransform);
-                    Node o = transform(q.getObject(), exprTransform);
+                quads.forEach(q->{
+                    Node g = transformOrSame(q.getGraph(), exprTransform);
+                    Node s = transformOrSame(q.getSubject(), exprTransform);
+                    Node p = transformOrSame(q.getPredicate(), exprTransform);
+                    Node o = transformOrSame(q.getObject(), exprTransform);
                     acc.addQuad(Quad.create(g, s, p, o));
                 });
                 Template template2 = new Template(acc);
@@ -139,15 +206,13 @@ public class QueryTransformOps {
                 mutateVarExprList(q2.getProject(), exprTransform);
                 break;
             case CONSTRUCT_JSON :
-                throw new UnsupportedOperationException("Transform of JSON template queries");
+                Map<String, Node> newJsonMapping = transformJsonMapping(q2.getJsonMapping(), exprTransform);
+                q2.setJsonMapping(newJsonMapping);
+                break;
             case UNKNOWN :
-                throw new JenaException("Unknown qu ery type");
+            default :
+                throw new JenaException("Unknown query type");
         }
-    }
-
-    public static Query transform(Query query, ElementTransform transform) {
-        ExprTransform noop = new ExprTransformApplyElementTransform(transform);
-        return transform(query, transform, noop);
     }
 
     // Transform CONSTRUCT query template
@@ -208,7 +273,7 @@ public class QueryTransformOps {
     private static void mutateDescribeVar(List<Var> varList, List<Node> constants, ExprTransform exprTransform) {
         List<Var> varList2 = new ArrayList<>(varList.size());
         for (Var v : varList) {
-            Node n = transform(v, exprTransform);
+            Node n = transformOrSame(v, exprTransform);
             if ( n != v ) {
                 if ( !constants.contains(n) )
                     constants.add(n);
@@ -263,26 +328,32 @@ public class QueryTransformOps {
         return varExprList2;
     }
 
-    // Transform a variable node (for low-usage cases).
-    // Returns node object for "no transform"
-    private static Node transform(Node node, ExprTransform exprTransform) {
+    private static Map<String, Node> transformJsonMapping(Map<String, Node> jsonMapping, ExprTransform exprTransform) {
+        Map<String, Node> result = new LinkedHashMap<>();
+        jsonMapping.forEach((k,n)->{
+            Node n2 = transformOrSame(n, exprTransform);
+            result.put(k, n2);
+        });
+        return result;
+    }
+
+    // Transform a variable node.
+    // Returns the argument java object for "no transform"
+    private static Node transformOrSame(Node node, ExprTransform exprTransform) {
         if ( ! Var.isVar(node) )
             return node;
-        Var v = Var.alloc(node);
-        ExprVar ev = new ExprVar(v);
-        Expr e2 = exprTransform.transform(ev);
-        if (e2 == null || e2 == ev )
+        Expr e2 = exprTransform.transform(node);
+        if ( e2 == null )
             return node;
         if ( ! e2.isConstant() )
-            return node ;
+            return node;
         return e2.getConstant().getNode();
     }
 
     static class QueryShallowCopy implements QueryVisitor {
         final Query newQuery = new Query();
 
-        QueryShallowCopy() {
-        }
+        QueryShallowCopy() {}
 
         @Override
         public void startVisit(Query query) {
@@ -300,14 +371,11 @@ public class QueryTransformOps {
                 for (String x : desc.getNamedGraphURIs())
                     newQuery.addNamedGraphURI(x);
             }
-
-            // Aggregators.
-            newQuery.getAggregators().addAll(query.getAggregators());
         }
 
         @Override
         public void visitPrologue(Prologue prologue) {
-            // newQuery.setBaseURI(prologue.getResolver()) ;
+            // newQuery.setBaseURI(prologue.getResolver());
             PrefixMapping pmap = new PrefixMappingImpl().setNsPrefixes(prologue.getPrefixMapping());
             newQuery.setPrefixMapping(pmap);
         }
@@ -346,6 +414,7 @@ public class QueryTransformOps {
         @Override
         public void visitJsonResultForm(Query query) {
             newQuery.setQueryJsonType();
+            newQuery.setJsonMapping(query.getJsonMapping());
         }
 
         @Override

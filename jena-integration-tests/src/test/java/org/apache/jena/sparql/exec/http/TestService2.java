@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -43,6 +43,11 @@ import org.junit.Test;
 
 /** Most tests of SERVICE */
 public class TestService2 {
+    // ---- Enable service
+    @BeforeClass public static void enableAllowServiceExecution() { CtlService.enableAllowServiceExecution(); }
+    @AfterClass public static void resetAllowServiceExecution() { CtlService.resetAllowServiceExecution(); }
+    public static Context minimalContext() { return CtlService.minimalContext(); }
+    // ----
 
     private static String SERVICE;
     private static EnvTest env;
@@ -96,10 +101,10 @@ public class TestService2 {
     }
 
     private void serviceSendMode(String sendMode) {
-        Node expected = NodeFactory.createLiteral("28181", XSDDatatype.XSDinteger);
+        Node expected = NodeFactory.createLiteralDT("28181", XSDDatatype.XSDinteger);
         String queryString = "SELECT * { SERVICE <"+SERVICE+"> { VALUES ?x { 28181 } } }";
 
-        Context cxt = new Context();
+        Context cxt = minimalContext();
         // Until GH-1399 is fixed, theer must be a setting for registryServiceExecutors
         cxt.set(ARQConstants.registryServiceExecutors, ARQ.getContext().get(ARQConstants.registryServiceExecutors));
         cxt.set(Service.httpServiceSendMode, sendMode);
@@ -114,7 +119,7 @@ public class TestService2 {
         try {
             if ( urlLimit > 0 )
                 HttpEnv.urlLimit = urlLimit;
-            Context cxt = new Context();
+            Context cxt = minimalContext();
             cxt.set(Service.httpServiceSendMode, sendMode);
             serviceSendMode_runTest(cxt);
         } finally {
@@ -123,7 +128,7 @@ public class TestService2 {
     }
 
     private void serviceSendMode_runTest(Context cxt) {
-        Node expected = NodeFactory.createLiteral("28181", XSDDatatype.XSDinteger);
+        Node expected = NodeFactory.createLiteralDT("28181", XSDDatatype.XSDinteger);
         String queryString = "SELECT * { SERVICE <"+SERVICE+"> { VALUES ?x { 28181 } } }";
         RowSet rs = QueryExec.dataset(localDataset()).query(queryString).select().materialize();
         assertTrue(rs.hasNext());

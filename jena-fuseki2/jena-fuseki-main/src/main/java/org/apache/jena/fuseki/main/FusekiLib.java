@@ -21,11 +21,14 @@ package org.apache.jena.fuseki.main;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.jena.fuseki.FusekiConfigException;
+import jakarta.servlet.ServletContext;
+import org.apache.jena.atlas.logging.Log;
+import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.access.AccessCtl_AllowGET;
 import org.apache.jena.fuseki.access.AccessCtl_Deny;
 import org.apache.jena.fuseki.access.AccessCtl_GSP_R;
@@ -35,8 +38,8 @@ import org.apache.jena.fuseki.server.*;
 import org.apache.jena.fuseki.servlets.ActionService;
 import org.apache.jena.fuseki.servlets.GSP_RW;
 import org.apache.jena.fuseki.servlets.HttpAction;
+import org.apache.jena.rdf.model.Model;
 import org.apache.jena.riot.WebContent;
-import org.apache.jena.sparql.core.DatasetGraph;
 
 /** Actions on and about a {@link FusekiServer} */
 public class FusekiLib {
@@ -54,32 +57,35 @@ public class FusekiLib {
     }
 
     /**
-     * Add a dataset to a server, with the default set of services.
-     * @deprecated Construct the server with the a {@link FusekiServer.Builder}.
+     * Process a configuration mode to find the DataServices and reset the server
+     * {@link DataAccessPointRegistry}. The only server-level setting processed is
+     * the {@code fuseki:services} list; other settings are ignored.
      */
-    @Deprecated
-    public static FusekiServer addDataset(FusekiServer server, String name, DatasetGraph dsg, boolean withUpdate) {
-        DataService dataService = FusekiConfig.buildDataServiceStd(dsg, withUpdate);
-        return addDataset(server, name, dataService);
+    public static void reload(FusekiServer server, Model configuration) {
+        // See also FusekiServer.applyDatabaseSetup
+        //      prepareDataServices(dapRegistry, operationReg);
+        //      OperationRegistry.set(servletContext, operationReg);
+        //      DataAccessPointRegistry.set(servletContext, dapRegistry);
+        DataAccessPointRegistry newRegistry = new DataAccessPointRegistry();
+        OperationRegistry operationRegistry = server.getOperationRegistry();
+
+        try {
+            List<DataAccessPoint> newDAPs = FusekiConfig.servicesAndDatasets(configuration.getGraph());
+            newDAPs.forEach(dap->newRegistry.register(dap));
+            FusekiServer.Builder.prepareDataServices(newRegistry, operationRegistry);
+            // Reload : switch DataAccessPointRegistry
+            setDataAccessPointRegistry(server, newRegistry);
+        } catch (RuntimeException ex) {
+            Log.error(Fuseki.serverLog,  "Failed to load a new configuration", ex);
+        }
     }
 
-    @Deprecated
-    /** Add a {@link DataService} to a server */
-    public static FusekiServer addDataset(FusekiServer server, String name, DataService dataService) {
-        DataAccessPointRegistry dataAccessPoints = DataAccessPointRegistry.get(server.getServletContext());
-        name = DataAccessPoint.canonical(name);
-        if ( dataAccessPoints.isRegistered(name) )
-            throw new FusekiConfigException("Data service name already registered: "+name);
-        FusekiConfig.addDataService(dataAccessPoints, name, dataService);
-        return server;
-    }
-
-    /** Remove dataset from a server */
-    @Deprecated
-    public static FusekiServer removeDataset(FusekiServer server, String name) {
-        DataAccessPointRegistry dataAccessPoints = DataAccessPointRegistry.get(server.getServletContext());
-        FusekiConfig.removeDataset(dataAccessPoints, name);
-        return server;
+    public static void setDataAccessPointRegistry(FusekiServer server,  DataAccessPointRegistry newRegistry) {
+        Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(newRegistry, "newRegistry");
+        ServletContext cxt = server.getServletContext();
+        // This is atomic (in Jetty, it is backed by a ConcurrentHashMap).
+        DataAccessPointRegistry.set(cxt, newRegistry);
     }
 
     /**
@@ -112,7 +118,6 @@ public class FusekiLib {
     public static void modifyForAccessCtl(DataAccessPointRegistry dapRegistry, Function<HttpAction, String> determineUser) {
         dapRegistry.forEach((name, dap) -> {
             dap.getDataService().forEachEndpoint(ep->{
-                Operation op = ep.getOperation();
                 modifyForAccessCtl(ep, determineUser);
             });
         });

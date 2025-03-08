@@ -17,8 +17,7 @@
 -->
 
 <!-- 
-  The distribution.
-  Assumes jar made and onejar has been assembled.
+  The distribution for Apache Jena Fuseki.
 -->
 
 <assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0"
@@ -39,38 +38,20 @@
     <dependencySet>
       <useProjectArtifact>false</useProjectArtifact>
       <includes>
-        <include>org.apache.jena:jena-fuseki-fulljar:jar</include>
+        <include>org.apache.jena:jena-fuseki-server:jar</include>
       </includes>
       <outputFileNameMapping>fuseki-server.jar</outputFileNameMapping>
-
     </dependencySet>
-    <!-- WAR file
-    <dependencySet>
-      <useProjectArtifact>false</useProjectArtifact>
-      <includes>
-        <include>org.apache.jena:jena-fuseki-war:war</include>
-      </includes>
-      <outputFileNameMapping>fuseki.war</outputFileNameMapping>
-    </dependencySet>
-    -->
   </dependencySets>
-
-  <files>
-    <file>
-      <source>dist/LICENSE</source>
-      <destName>LICENSE</destName>
-    </file>
-    <file>
-      <source>dist/NOTICE</source>
-      <destName>NOTICE</destName>
-    </file>
-    <file>
-      <source>dist/README</source>
-      <destName>README</destName>
-    </file>
-  </files>
-
+  
   <fileSets>
+
+    <fileSet>
+      <!-- NOTICE, LICENSE, README -->
+      <directory>dist</directory>
+      <outputDirectory></outputDirectory>
+    </fileSet>
+    
     <fileSet>
       <outputDirectory></outputDirectory>
       <includes>
@@ -91,20 +72,14 @@
     </fileSet>
 
     <fileSet>
-       <!-- Executables -->
-       <outputDirectory></outputDirectory>
-       <fileMode>0755</fileMode>
-       <includes>
-         <include>fuseki-server</include>
-         <include>fuseki-backup</include>
-         <include>bin/*</include>
-       </includes>
-     </fileSet>
-
-    <fileSet>
-      <directory>../jena-fuseki-webapp/target/webapp/</directory>
-      <outputDirectory>webapp</outputDirectory>
+      <!-- Executables -->
+      <outputDirectory></outputDirectory>
+      <fileMode>0755</fileMode>
+      <includes>
+        <include>fuseki-server</include>
+        <include>fuseki-backup</include>
+      </includes>
     </fileSet>
-
+    
   </fileSets>
 </assembly>

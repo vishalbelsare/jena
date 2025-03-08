@@ -18,6 +18,8 @@
 
 package org.apache.jena.update;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.sparql.util.Context;
@@ -34,6 +36,9 @@ public interface UpdateExecutionBuilder {
     /** Parse and update operations to the {@link UpdateRequest} being built. */
     public UpdateExecutionBuilder update(String updateRequestString);
 
+    /** Hint whether to immediately parse update strings passed to {@link #update(String)}. */
+    public UpdateExecutionBuilder parseCheck(boolean parseCheck);
+
     public UpdateExecutionBuilder set(Symbol symbol, Object value);
 
     public UpdateExecutionBuilder set(Symbol symbol, boolean value);
@@ -43,6 +48,10 @@ public interface UpdateExecutionBuilder {
     public UpdateExecutionBuilder substitution(QuerySolution querySolution);
 
     public UpdateExecutionBuilder substitution(String varName, RDFNode value);
+
+    public UpdateExecutionBuilder timeout(long value, TimeUnit timeUnit);
+
+    public default UpdateExecutionBuilder timeout(long value) { return timeout(value, TimeUnit.MILLISECONDS); }
 
     public UpdateExecution build();
 

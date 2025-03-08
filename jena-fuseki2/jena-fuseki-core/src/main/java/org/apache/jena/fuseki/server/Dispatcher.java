@@ -26,8 +26,8 @@ import static org.apache.jena.fuseki.server.Operation.Query;
 import static org.apache.jena.fuseki.server.Operation.Update;
 import static org.apache.jena.fuseki.servlets.ActionExecLib.allocHttpAction;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.atlas.logging.FmtLog;
@@ -144,6 +144,7 @@ public class Dispatcher {
                 LOG.debug("No dispatch for '"+request.getRequestURI()+"'");
             return false;
         }
+        // The execution code is in ActionExecLib.execAction
         return process(dap, request, response);
     }
 
@@ -174,7 +175,16 @@ public class Dispatcher {
         return dap;
     }
 
+    /**
+     * Identity the Fuseki service for the request
+     */
     /*package:testing*/ static DataAccessPoint locateDataAccessPoint(String uri, DataAccessPointRegistry registry) {
+        // Cases:
+        // /dataset
+        // /dataset/endpoint
+        // /path/.../dataset/
+        // /path/.../dataset/endpoint
+
         // Direct match.
         if ( registry.isRegistered(uri) )
             // Cases: /, /dataset and /path/dataset where /path is not the servlet context path.
@@ -328,10 +338,10 @@ public class Dispatcher {
         }
 
         // If there is one endpoint, dispatch there directly.
-        Endpoint ep = epSet.getExactlyOne();
-        if ( ep != null )
+        Endpoint ep1 = epSet.getExactlyOne();
+        if ( ep1 != null )
             // Single dispatch, may not be valid.
-            return ep;
+            return ep1;
 
         // No single direct dispatch. Multiple choices (different operation, same endpoint name)
         // Work out which operation we are looking for based on SPARQL characteristics.
@@ -343,7 +353,7 @@ public class Dispatcher {
             operation = mapGSP(action, operation, epSet);
         if ( operation == null )
             ServletOps.errorBadRequest("No operation for request: "+action.getActionURI());
-        ep = epSet.get(operation);
+        Endpoint ep = epSet.get(operation);
         // There are multiple endpoints; if none are suitable, then 400.
         if ( ep == null )
             ServletOps.errorBadRequest("No operation for request: "+action.getActionURI());
@@ -378,11 +388,11 @@ public class Dispatcher {
             } else if ( GSP_RW.equals(operation) ) {
                 // If asking for GSP_RW, but only GSP_R is available ...
                 // ... if OPTIONS, use GSP_R.
-                if ( action.getMethod().equals(HttpNames.METHOD_OPTIONS) && epSet.contains(GSP_R) )
+                if ( action.getRequestMethod().equals(HttpNames.METHOD_OPTIONS) && epSet.contains(GSP_R) )
                         return GSP_R;
                 // ... else 405
                 if ( epSet.contains(GSP_R) )
-                    ServletOps.errorMethodNotAllowed(action.getMethod());
+                    ServletOps.errorMethodNotAllowed(action.getRequestMethod());
             }
         }
         return operation;

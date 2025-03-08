@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,14 +18,14 @@
 
 package org.apache.jena.fuseki.webapp;
 
-import javax.servlet.ServletContext;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletContextEvent;
+import jakarta.servlet.ServletContextListener;
 import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.FusekiException;
 import org.apache.jena.fuseki.cmd.FusekiArgs;
-import org.apache.jena.fuseki.metrics.MetricsProviderRegistry;
+import org.apache.jena.fuseki.metrics.MetricsProvider;
+import org.apache.jena.fuseki.metrics.PrometheusMetricsProvider;
 import org.apache.jena.fuseki.server.DataAccessPointRegistry;
 import org.apache.jena.fuseki.server.FusekiCoreInfo;
 import org.apache.jena.fuseki.server.OperationRegistry;
@@ -59,7 +59,7 @@ public class FusekiServerListener implements ServletContextListener {
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        org.apache.jena.tdb.sys.TDBInternal.reset();
+        org.apache.jena.tdb1.sys.TDBInternal.reset();
         org.apache.jena.tdb2.sys.TDBInternal.reset();
     }
 
@@ -102,7 +102,9 @@ public class FusekiServerListener implements ServletContextListener {
                 //Fuseki.configLog.info("Register: "+dap.getName());
             });
 
-            MetricsProviderRegistry.bindPrometheus(dataAccessPointRegistry);
+            MetricsProvider metricsProvider = new PrometheusMetricsProvider();
+            MetricsProvider.setMetricsProvider(servletContext, metricsProvider);
+            metricsProvider.dataAccessPointMetrics(metricsProvider, dataAccessPointRegistry);
 
         } catch (Throwable th) {
             Fuseki.serverLog.error("Exception in initialization: {}", th.getMessage());

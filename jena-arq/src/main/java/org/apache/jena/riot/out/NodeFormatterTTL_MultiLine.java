@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -121,7 +121,7 @@ public class NodeFormatterTTL_MultiLine extends NodeFormatterTTL {
 
         if ( action != null )
             action.run();
-        if ( indent >= 0 )
+        if ( iw != null && indent >= 0 )
             iw.setAbsoluteIndent(indent);
     }
 }

@@ -20,8 +20,6 @@ package org.apache.jena.sparql.algebra ;
 
 import java.util.* ;
 import java.util.function.BiConsumer ;
-import java.util.stream.Collectors ;
-
 import org.apache.jena.atlas.lib.NotImplemented ;
 import org.apache.jena.graph.Node ;
 import org.apache.jena.graph.Triple ;
@@ -83,6 +81,25 @@ public class OpAsQuery {
         return converter.convert() ;
     }
 
+    public static Element asElement(Op op) {
+        Query query = asQuery(op);
+        Element elt = isPrimitiveQuery(query)
+            ? query.getQueryPattern()
+            : new ElementSubQuery(query);
+        return elt;
+    }
+
+    /** Whether the query is a plain <code>SELECT * { pattern }</code>.  */
+    private static boolean isPrimitiveQuery(Query query) {
+        boolean isNonPrimitive =
+            !query.isQueryResultStar() || query.isDistinct() || query.isReduced() ||
+            query.hasLimit() || query.hasOffset() ||
+            query.hasAggregators() || query.hasGroupBy() || query.hasHaving() ||
+            query.hasOrderBy() ||
+            query.hasValues();
+        return !isNonPrimitive;
+    }
+
     static class /* struct */ QueryLevelDetails {
         // The stack of processing in a query is:
         // slice-distinct/reduce-project-order-filter[having]-extend*[AS and aggregate naming]-group-pattern
@@ -116,12 +133,12 @@ public class OpAsQuery {
             if ( opHaving != null )
                 System.out.printf("having: %s\n", opHaving.getExprs()) ;
             if ( opExtends != null && !opExtends.isEmpty() ) {
-                List<VarExprList> z = opExtends.stream().map(x -> x.getVarExprList()).collect(Collectors.toList()) ;
+                List<VarExprList> z = opExtends.stream().map(x -> x.getVarExprList()).toList() ;
                 System.out.printf("assigns: %s\n", z) ;
             }
             if ( opGroup != null ) {
                 List<ExprAggregator> aggregators = opGroup.getAggregators() ;
-                List<Var> aggVars = aggregators.stream().map(x -> x.getAggVar().asVar()).collect(Collectors.toList()) ;
+                List<Var> aggVars = aggregators.stream().map(x -> x.getAggVar().asVar()).toList() ;
                 System.out.printf("group: %s |-| %s\n", opGroup.getGroupVars(), opGroup.getAggregators()) ;
                 System.out.printf("group agg vars: %s\n", aggVars) ;
             }
@@ -392,7 +409,7 @@ public class OpAsQuery {
 
         private static void processAssigns(List<OpAssign> assigns, BiConsumer<Var, Expr> action) {
             assigns.forEach(assign->{
-                assign.getVarExprList().forEachExpr(action) ;
+                assign.getVarExprList().forEachVarExpr(action) ;
             });
         }
 
@@ -548,7 +565,7 @@ public class OpAsQuery {
                 return e ;
             }
 
-            if ( query.getSyntax() == Syntax.syntaxSPARQL_11 || query.getSyntax() == Syntax.syntaxARQ ) {
+            if ( query.getSyntax() == Syntax.syntaxSPARQL_12 || query.getSyntax() == Syntax.syntaxSPARQL_11 || query.getSyntax() == Syntax.syntaxARQ ) {
                 ElementPathBlock e = new ElementPathBlock() ;
                 for ( Triple t : pattern )
                     // Leave bNode variables as they are
@@ -826,6 +843,15 @@ public class OpAsQuery {
             processExtends(Arrays.asList(opExtend), (var,expr)->{
                 currentGroup().addElement(new ElementBind(var,expr)) ;
             }) ;
+        }
+
+        @Override
+        public void visit(OpUnfold opUnfold) {
+            Element e = asElement(opUnfold.getSubOp()) ;
+            // If (unfold ... (table unit)), and first in group, don't add the empty group.
+            insertIntoGroup(currentGroup(), e) ;
+            Element elmtUnfold = new ElementUnfold( opUnfold.getExpr(), opUnfold.getVar1(), opUnfold.getVar2() ) ;
+            currentGroup().addElement(elmtUnfold) ;
         }
 
         @Override

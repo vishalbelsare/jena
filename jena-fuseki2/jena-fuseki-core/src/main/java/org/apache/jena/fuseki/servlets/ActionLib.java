@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -28,9 +28,9 @@ import java.nio.charset.CharacterCodingException;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.jena.atlas.RuntimeIOException;
 import org.apache.jena.atlas.io.IO;
@@ -111,7 +111,7 @@ public class ActionLib {
      * @return String The full URL, including query string.
      */
     public static String wholeRequestURL(HttpServletRequest request) {
-        StringBuffer sb = request.getRequestURL();
+        StringBuilder sb = new StringBuilder(request.getRequestURL());
         String queryString = request.getQueryString();
         if ( queryString != null ) {
             sb.append("?");
@@ -202,7 +202,7 @@ public class ActionLib {
      * Parse RDF content from the body of the request of the action, ends the
      * request, and sends a 400 if there is a parse error.
      *
-     * @throws ActionErrorException
+     * @throws ActionErrorException ActionErrorException
      */
     public static void parseOrError(HttpAction action, StreamRDF dest, Lang lang, String base) {
         try {
@@ -216,7 +216,7 @@ public class ActionLib {
     /**
      * Parse RDF content. This wraps up the parse step reading from an action.
      * It includes handling compression if the {@code Content-Encoding} header is present
-     * @throws RiotParseException
+     * @throws RiotParseException RiotParseException
      */
     public static void parse(HttpAction action, StreamRDF dest, Lang lang, String base) {
         try {
@@ -227,7 +227,7 @@ public class ActionLib {
 
     /**
      * Parse RDF content. This wraps up the parse step reading from an input stream.
-     * @throws RiotParseException
+     * @throws RiotParseException RiotParseException
      */
     public static void parse(HttpAction action, StreamRDF dest, InputStream input, Lang lang, String base) {
         try {
@@ -333,7 +333,7 @@ public class ActionLib {
     }
 
     /**
-     * Output a graph to the HTTP response (does not set the status code) using the given Content-Type string.
+     * Output a graph to the HTTP response using the given Content-Type string.
      * One of {@code lang} and {@code fmt} maybe null and will be calculated.
      * {@code actualContentType} maybe null in which case the standard content type for the syntax is used.
      */
@@ -389,7 +389,7 @@ public class ActionLib {
 
     /**
      * Get the content type of an action.
-     * @param  action
+     * @param  action HttpAction
      * @return ContentType
      */
     public static ContentType getContentType(HttpAction action) {
@@ -401,8 +401,6 @@ public class ActionLib {
     }
 
     private static void setCommonHeadersForOptions(HttpServletResponse httpResponse) {
-        if ( Fuseki.CORS_ENABLED )
-            httpResponse.setHeader(HttpNames.hAccessControlAllowHeaders, "X-Requested-With, Content-Type, Authorization");
         setCommonHeaders(httpResponse);
     }
 
@@ -411,8 +409,6 @@ public class ActionLib {
     }
 
     private static void setCommonHeaders(HttpServletResponse httpResponse) {
-        if ( Fuseki.CORS_ENABLED )
-            httpResponse.setHeader(HttpNames.hAccessControlAllowOrigin, "*");
         if ( Fuseki.outputFusekiServerHeader )
             httpResponse.setHeader(HttpNames.hServer, Fuseki.serverHttpName);
     }

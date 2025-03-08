@@ -19,6 +19,7 @@
 package org.apache.jena.fuseki.servlets;
 
 import static java.lang.String.format;
+import static org.apache.jena.atlas.lib.Lib.uppercase;
 import static org.apache.jena.fuseki.server.CounterName.QueryTimeouts;
 import static org.apache.jena.fuseki.servlets.ActionExecLib.incCounter;
 import static org.apache.jena.riot.WebContent.ctHTMLForm;
@@ -31,8 +32,7 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.http.HttpServletRequest;
-
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.jena.atlas.io.IO;
 import org.apache.jena.atlas.io.IndentedLineBuffer;
 import org.apache.jena.atlas.json.JsonObject;
@@ -40,16 +40,16 @@ import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.atlas.web.ContentType;
 import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.system.FusekiNetLib;
+import org.apache.jena.graph.Graph;
 import org.apache.jena.query.*;
-import org.apache.jena.rdf.model.Model;
 import org.apache.jena.riot.web.HttpNames;
 import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sparql.core.Prologue;
 import org.apache.jena.sparql.engine.Timeouts;
 import org.apache.jena.sparql.exec.QueryExec;
 import org.apache.jena.sparql.exec.QueryExecDatasetBuilder;
-import org.apache.jena.sparql.exec.QueryExecutionAdapter;
-import org.apache.jena.sparql.resultset.SPARQLResult;
+import org.apache.jena.sparql.exec.QueryExecResult;
+import org.apache.jena.sparql.exec.RowSet;
 import org.apache.jena.web.HttpSC;
 
 /**
@@ -111,7 +111,7 @@ public abstract class SPARQLQueryProcessor extends ActionService
      */
     @Override
     public void validate(HttpAction action) {
-        String method = action.getRequestMethod().toUpperCase(Locale.ROOT);
+        String method = uppercase(action.getRequestMethod());
 
         if ( HttpNames.METHOD_OPTIONS.equals(method) )
             return;
@@ -237,15 +237,20 @@ public abstract class SPARQLQueryProcessor extends ActionService
     }
 
     protected void execute(String queryString, HttpAction action) {
+        if ( queryString.isEmpty() )
+            ServletOps.errorBadRequest("Error: Empty query string");
+        if ( queryString.isBlank() )
+            ServletOps.errorBadRequest("Error: Blank query string");
+
         String queryStringLog = ServletOps.formatForLog(queryString);
         if ( action.verbose ) {
             String str = queryString;
             if ( str.endsWith("\n") )
                 str = str.substring(0, str.length()-1);
             action.log.info(format("[%d] Query = \n%s", action.id, str));
-        }
-        else
+        } else {
             action.log.info(format("[%d] Query = %s", action.id, queryStringLog));
+        }
 
         Query query = null;
         try {
@@ -266,7 +271,7 @@ public abstract class SPARQLQueryProcessor extends ActionService
             ServletOps.errorBadRequest("Error: \n" + queryString + "\n" + msg);
         }
 
-        // Assumes finished whole thing by end of sendResult.
+        // Assumes finished whole thing by end of sendResults.
         try {
             action.beginRead();
             Pair<DatasetGraph, Query> p = decideDataset(action, query, queryStringLog);
@@ -275,21 +280,27 @@ public abstract class SPARQLQueryProcessor extends ActionService
             if ( q == null )
                 q = query;
 
-            try ( QueryExecution qExec = createQueryExecution(action, q, dataset); ) {
-                SPARQLResult result = executeQuery(action, qExec, query, queryStringLog);
-                // Deals with exceptions itself.
+            try ( QueryExec qExec = createQueryExec(action, q, dataset); ) {
+                QueryExecResult result = executeQuery(action, qExec, query, queryStringLog);
+                // Deals with response exceptions itself.
                 sendResults(action, result, query.getPrologue());
             }
         }
         catch (QueryParseException ex) {
+            abortSilent(action);
             // Late stage static error (e.g. bad fixed Lucene query string).
             ServletOps.errorBadRequest("Query parse error: \n" + queryString + "\n" + SPARQLProtocol.messageForException(ex));
         }
         catch (QueryCancelledException ex) {
+            abortSilent(action);
             // Additional counter information.
             incCounter(action.getEndpoint().getCounters(), QueryTimeouts);
             throw ex;
         } finally { action.endRead(); }
+    }
+
+    private static void abortSilent(HttpAction action) {
+        action.abortSilent();
     }
 
     /**
@@ -300,13 +311,13 @@ public abstract class SPARQLQueryProcessor extends ActionService
      */
     protected abstract void validateQuery(HttpAction action, Query query);
 
-    /** Create the {@link QueryExecution} for this operation.
+    /** Create the {@link QueryExec} for this operation.
      * @param action
      * @param query
      * @param dataset
-     * @return QueryExecution
+     * @return QueryExec
      */
-    protected QueryExecution createQueryExecution(HttpAction action, Query query, DatasetGraph dataset) {
+    protected QueryExec createQueryExec(HttpAction action, Query query, DatasetGraph dataset) {
         QueryExecDatasetBuilder builder = QueryExec.newBuilder()
                 .dataset(dataset)
                 .query(query)
@@ -314,7 +325,7 @@ public abstract class SPARQLQueryProcessor extends ActionService
                 ;
         setTimeouts(builder, action);
         QueryExec qExec = builder.build();
-        return QueryExecutionAdapter.adapt(qExec);
+        return qExec;
     }
 
     /**
@@ -362,16 +373,16 @@ public abstract class SPARQLQueryProcessor extends ActionService
             return setupTimeout;
     }
 
-    /** Perform the {@link QueryExecution} once.
+    /** Perform the {@link QueryExec} once.
      * @param action
-     * @param queryExecution
-     * @param requestQuery Original query; queryExecution query may have been modified.
+     * @param queryExec
+     * @param requestQuery Original query; the QueryExec query may have been modified.
      * @param queryStringLog Informational string created from the initial query.
      * @return
      */
-    protected SPARQLResult executeQuery(HttpAction action, QueryExecution queryExecution, Query requestQuery, String queryStringLog) {
+    protected QueryExecResult executeQuery(HttpAction action, QueryExec queryExec, Query requestQuery, String queryStringLog) {
         if ( requestQuery.isSelectType() ) {
-            ResultSet rs = queryExecution.execSelect();
+            RowSet rs = queryExec.select();
 
             // Force some query execution now.
             // If the timeout-first-row goes off, the output stream has not
@@ -383,33 +394,28 @@ public abstract class SPARQLQueryProcessor extends ActionService
             // the result now to see if the timeout-end-of-query goes off.
             // rs = ResultSetFactory.copyResults(rs);
 
-            //action.log.info(format("[%d] exec/select", action.id));
-            return new SPARQLResult(rs);
+            return new QueryExecResult(rs);
         }
 
         if ( requestQuery.isConstructType() ) {
-            Dataset dataset = queryExecution.execConstructDataset();
-            //action.log.info(format("[%d] exec/construct", action.id));
-            return new SPARQLResult(dataset);
+            DatasetGraph dataset = queryExec.constructDataset();
+            return new QueryExecResult(dataset);
         }
 
         if ( requestQuery.isDescribeType() ) {
-            Model model = queryExecution.execDescribe();
-            //action.log.info(format("[%d] exec/describe", action.id));
-            return new SPARQLResult(model);
+            Graph graph = queryExec.describe();
+            return new QueryExecResult(graph);
         }
 
         if ( requestQuery.isAskType() ) {
-            boolean b = queryExecution.execAsk();
-            //action.log.info(format("[%d] exec/ask", action.id));
-            return new SPARQLResult(b);
+            boolean b = queryExec.ask();
+            return new QueryExecResult(b);
         }
 
         if ( requestQuery.isJsonType() ) {
-            Iterator<JsonObject> jsonIterator = queryExecution.execJsonItems();
-            //JsonArray jsonArray = queryExecution.execJson();
-            action.log.info(format("[%d] exec/json", action.id));
-            return new SPARQLResult(jsonIterator);
+            Iterator<JsonObject> jsonIterator = queryExec.execJsonItems();
+            //JsonArray jsonArray = queryExec.execJson();
+            return new QueryExecResult(jsonIterator);
         }
 
         ServletOps.errorBadRequest("Unknown query type - " + queryStringLog);
@@ -429,19 +435,19 @@ public abstract class SPARQLQueryProcessor extends ActionService
      * @param result
      * @param qPrologue
      */
-    protected void sendResults(HttpAction action, SPARQLResult result, Prologue qPrologue) {
-        if ( result.isResultSet() )
-            ResponseResultSet.doResponseResultSet(action, result.getResultSet(), qPrologue);
+    protected void sendResults(HttpAction action, QueryExecResult result, Prologue qPrologue) {
+        if ( result.isRowSet() )
+            Responses.doResponseResultSet(action, result.rowSet(), qPrologue);
         else if ( result.isDataset() )
             // CONSTRUCT is processed as a extended CONSTRUCT - result is a dataset.
-            ResponseDataset.doResponseDataset(action, result.getDataset());
-        else if ( result.isModel() )
-            // DESCRIBE results are models
-            ResponseDataset.doResponseModel(action, result.getModel());
+            Responses.doResponseDataset(action, result.dataset());
+        else if ( result.isGraph() )
+            // DESCRIBE results are graphs
+            Responses.doResponseGraph(action, result.graph());
         else if ( result.isBoolean() )
-            ResponseResultSet.doResponseResultSet(action, result.getBooleanResult());
+            Responses.doResponseBoolean(action, result.booleanResult());
         else if ( result.isJson() )
-            ResponseJson.doResponseJson(action, result.getJsonItems());
+            Responses.doResponseJson(action, result.jsonItems());
         else
             ServletOps.errorOccurred("Unknown or invalid result type");
     }
