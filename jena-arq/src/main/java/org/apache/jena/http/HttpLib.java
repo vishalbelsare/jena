@@ -24,6 +24,7 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublisher;
 import java.net.http.HttpRequest.BodyPublishers;
@@ -45,6 +46,7 @@ import java.util.zip.InflaterInputStream;
 import org.apache.jena.atlas.RuntimeIOException;
 import org.apache.jena.atlas.io.IO;
 import org.apache.jena.atlas.lib.IRILib;
+import org.apache.jena.atlas.logging.FmtLog;
 import org.apache.jena.atlas.web.HttpException;
 import org.apache.jena.atlas.web.TypedInputStream;
 import org.apache.jena.http.auth.AuthEnv;
@@ -56,6 +58,8 @@ import org.apache.jena.riot.web.HttpNames;
 import org.apache.jena.sparql.exec.http.Params;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.web.HttpSC;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Operations related to SPARQL HTTP requests - Query, Update and Graph Store protocols.
@@ -63,7 +67,12 @@ import org.apache.jena.web.HttpSC;
  */
 public class HttpLib {
 
+    // JDK HTTP debug:
+    // -Djdk.httpclient.HttpClient.log=errors,requests,headers,frames[:control:data:window:all..],content,ssl,trace,channel
+
     private HttpLib() {}
+
+    private static Logger LOG = LoggerFactory.getLogger(HttpLib.class.getPackageName()+".HTTP");
 
     public static BodyHandler<Void> noBody() { return BodyHandlers.discarding(); }
 
@@ -94,16 +103,32 @@ public class HttpLib {
         return "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
     }
 
+    public static String BEARER = "Bearer";
+    public static String BEARER_PREFIX = BEARER+" ";
+
     /**
      * Calculate bearer auth header value.
      * The token supplied is expected to already be in base 64.
      * Use with header "Authorization" (constant {@link HttpNames#hAuthorization}).
      */
-    public static String bearerAuth(String tokenBase64) {
+    public static String bearerAuthHeader(String tokenBase64) {
         Objects.requireNonNull(tokenBase64);
         if ( tokenBase64.indexOf(' ') >= 0 )
             throw new IllegalArgumentException("Base64 token contains a space");
-        return "Bearer " + tokenBase64;
+        return BEARER_PREFIX + tokenBase64;
+    }
+
+    /**
+     * Extract the token, without decoding,
+     * The token supplied is expected to already be in base 64.
+     * Use with header "Authorization" (constant {@link HttpNames#hAuthorization}).
+     */
+    public static String bearerAuthTokenFromHeader(String authHeaderString) {
+        Objects.requireNonNull(authHeaderString);
+        if ( ! authHeaderString.startsWith(BEARER_PREFIX) ) {
+            throw new IllegalArgumentException("Auth headerString does not start 'Bearer ...'");
+        }
+        return authHeaderString.substring("Bearer ".length()).trim();
     }
 
     /**
@@ -219,7 +244,21 @@ public class HttpLib {
      * @return String
      */
     public static String handleResponseRtnString(HttpResponse<InputStream> response) {
+        return handleResponseRtnString(response, null);
+    }
+
+    /**
+     * Handle the HTTP response and read the body to produce a string if a 200.
+     * Otherwise, throw an {@link HttpException}.
+     * @param response
+     * @param callback A callback that receives the opened input stream.
+     * @return String
+     */
+    public static String handleResponseRtnString(HttpResponse<InputStream> response, Consumer<InputStream> callback) {
         InputStream input = handleResponseInputStream(response);
+        if (callback != null) {
+            callback.accept(input);
+        }
         try {
             return IO.readWholeFileAsUTF8(input);
         } catch (RuntimeIOException e) { throw new HttpException(e); }
@@ -232,9 +271,9 @@ public class HttpLib {
      */
     static HttpException exception(HttpResponse<InputStream> response, int httpStatusCode) {
         URI uri = response.request().uri();
-        //long length = HttpLib.getContentLength(response);
-        // Not critical path code. Read body regardless.
         InputStream in = response.body();
+        if ( in == null )
+            return new HttpException(httpStatusCode, HttpSC.getMessage(httpStatusCode));
         try {
             String msg;
             try {
@@ -253,7 +292,7 @@ public class HttpLib {
         if ( x.isEmpty() )
             return -1;
         try {
-            return Long.parseLong(x.get());
+            return Long.parseLong(x.orElseThrow());
         } catch (NumberFormatException ex) { return -1; }
     }
 
@@ -569,7 +608,26 @@ public class HttpLib {
     }
 
     /**
-     * Execute request and return a response without authentication challenge handling.
+     * Execute request and return a {@code HttpResponse<InputStream>} response.
+     * Status codes have not been handled. The response can be passed to
+     * {@link #handleResponseInputStream(HttpResponse)} which will convert non-2xx
+     * status code to {@link HttpException HttpExceptions}.
+     *
+     * @param httpClient
+     * @param httpRequest
+     * @return HttpResponse
+     */
+    public static HttpResponse<InputStream> executeJDK(HttpClient httpClient, HttpRequest httpRequest) {
+        return execute(httpClient, httpRequest, BodyHandlers.ofInputStream());
+    }
+
+    /**
+     * Execute request and return a response without authentication challenge
+     * handling. Status codes have not been handled. This is a call to
+     * {@code HttpClient.send} converting exceptions to {@link HttpException}.
+     * request and responses are logged as "debug" to logger
+     * {@code org.apache.jena.http.HTTP}.
+     *
      * @param httpClient
      * @param httpRequest
      * @param bodyHandler
@@ -623,12 +681,10 @@ public class HttpLib {
 
     /** Request */
     private static void logRequest(HttpRequest httpRequest) {
-        // Uses the SystemLogger which defaults to JUL.
-        // Add org.apache.jena.logging:log4j-jpl
-        // (java11 : 11.0.9, if using log4j-jpl, logging prints the request as {0} but response OK)
-//        httpRequest.uri();
-//        httpRequest.method();
-//        httpRequest.headers();
+        if ( LOG.isDebugEnabled() ) {
+            FmtLog.debug(LOG, "> %s %s", httpRequest.method(), httpRequest.uri());
+            logHeaders(LOG, httpRequest.headers());
+        }
     }
 
     /** Async Request */
@@ -636,10 +692,17 @@ public class HttpLib {
 
         /** Response (do not touch the body!)  */
     private static void logResponse(HttpResponse<?> httpResponse) {
-//        httpResponse.uri();
-//        httpResponse.statusCode();
-//        httpResponse.headers();
+        if ( LOG.isDebugEnabled() ) {
+            FmtLog.debug(LOG, "< %d %s %s", httpResponse.statusCode(), httpResponse.request().method(), httpResponse.uri());
+            logHeaders(LOG,  httpResponse.headers());
 //        httpResponse.previousResponse();
+        }
+    }
+
+    private static void logHeaders(Logger log, HttpHeaders headers) {
+        headers.map().forEach((header, values)->{
+            values.forEach(value->FmtLog.debug(log, "  %-15s %s", header, value));
+        });
     }
 
     /**
@@ -731,7 +794,7 @@ public class HttpLib {
         Optional<String> value2 = response.headers().firstValue("Server");
         if ( value2.isEmpty() )
             return false;
-        String headerValue = value2.get();
+        String headerValue = value2.orElseThrow();
         boolean isFuseki = headerValue.startsWith("Apache Jena Fuseki") ||
                            headerValue.toLowerCase().contains("fuseki");
         return isFuseki;

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -24,7 +24,7 @@ import java.util.Iterator;
  * Wrap an iterator except for remove which throws UnsupportedOperationException.
  * @deprecated Use {@link Iter#noRemove(Iterator)}.
  */
-@Deprecated
+@Deprecated(forRemoval = true)
 public class IteratorNoRemove<T> extends IteratorWrapper<T> {
 
     public IteratorNoRemove(int x, Iterator<T> iterator) {

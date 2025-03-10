@@ -22,76 +22,48 @@ import java.util.Calendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
 import org.apache.jena.atlas.lib.DateTimeUtils;
+import org.apache.jena.atlas.lib.Version;
+import org.apache.jena.fuseki.system.FusekiCore;
 import org.apache.jena.query.ARQ;
 import org.apache.jena.riot.system.stream.LocatorFTP;
 import org.apache.jena.riot.system.stream.LocatorHTTP;
 import org.apache.jena.riot.system.stream.StreamManager;
-import org.apache.jena.sparql.SystemARQ;
-import org.apache.jena.sparql.mgt.SystemInfo;
 import org.apache.jena.sparql.util.Context;
-import org.apache.jena.sparql.util.MappingRegistry;
-import org.apache.jena.sys.JenaSystem;
-import org.apache.jena.tdb.TDB;
-import org.apache.jena.tdb.transaction.TransactionManager;
-import org.apache.jena.util.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Fuseki {
     // General fixed constants.
-    // See also FusekiServer for the naming on the filesystem
 
     /** Path as package name */
-    static public String    PATH                         = "org.apache.jena.fuseki";
+    static public final String PATH               = "org.apache.jena.fuseki";
 
     /** a unique IRI for the Fuseki namespace */
-    static public String    FusekiIRI                    = "http://jena.apache.org/Fuseki";
+    static public final String FusekiIRI          = "http://jena.apache.org/Fuseki";
 
     /**
      * a unique IRI including the symbol notation for which properties should be
      * appended
      */
-    static public String    FusekiSymbolIRI              = "http://jena.apache.org/fuseki#";
+    static public final String FusekiSymbolIRI    = "http://jena.apache.org/fuseki#";
 
     /** Default location of the pages for the Fuseki UI  */
-    static public String    PagesStatic                  = "pages";
+    static public final String PagesStatic        = "pages";
 
     /** Dummy base URi string for parsing SPARQL Query and Update requests */
-    static public final String BaseParserSPARQL          = "http://server/unset-base/";
+    static public final String BaseParserSPARQL   = "http://server/unset-base/";
 
     /** Dummy base URi string for parsing SPARQL Query and Update requests */
-    static public final String BaseUpload                = "http://server/unset-base/";
-
-    /** Add CORS header */
-    static public final boolean CORS_ENABLED = false;
-
-    /**
-     * A relative resources path to the location of
-     * <code>fuseki-properties.xml</code> file.
-     */
-    static private String   metadataLocation             = "org/apache/jena/fuseki/fuseki-properties.xml";
-
-    /**
-     * Object which holds metadata specified within
-     * {@link Fuseki#metadataLocation}
-     */
-    static private Metadata metadata                     = initMetadata();
-
-    private static Metadata initMetadata() {
-        return new Metadata(metadataLocation);
-    }
+    static public final String BaseUpload         = "http://server/unset-base/";
 
     /** The name of the Fuseki server.*/
-    static public final String        NAME              = "Apache Jena Fuseki";
+    static public final String  NAME              = "Apache Jena Fuseki";
 
     /** Version of this Fuseki instance */
-    static public final String        VERSION           = metadata.get(PATH + ".version", "development");
-
-    /** Date when Fuseki was built */
-    static public final String        BUILD_DATE        = metadata.get(PATH + ".build.datetime", "unknown");
+    static public final String  VERSION           = Version.versionForClass(Fuseki.class).orElse("<development>");
 
     /** Supporting Graph Store Protocol direct naming.
      * <p>
@@ -128,6 +100,12 @@ public class Fuseki {
     public static boolean   outputJettyServerHeader     = developmentMode;
     public static boolean   outputFusekiServerHeader    = developmentMode;
 
+    /**
+     * Initialize is class.
+     * See also {@link FusekiCore} for Fuseki core initialization.
+     */
+    public static void initConsts() {}
+
     /** An identifier for the HTTP Fuseki server instance */
     static public final String  serverHttpName          = NAME + " (" + VERSION + ")";
 
@@ -136,6 +114,9 @@ public class Fuseki {
 
     /** Instance of log for operations */
     public static final Logger        actionLog         = LoggerFactory.getLogger(actionLogName);
+
+    /** Instance of log for operations : alternative variable name */
+    public static final Logger        fusekiLog         = LoggerFactory.getLogger(actionLogName);
 
     /** Logger name for standard webserver log file request log */
     public static final String        requestLogName    = PATH + ".Request";
@@ -151,14 +132,16 @@ public class Fuseki {
     /** Instance of log for operations. */
     public static final Logger        adminLog          = LoggerFactory.getLogger(adminLogName);
 
-    /** Admin log file for operations. */
-    public static final String        builderLogName    = PATH + ".Builder";
-
-    /** Instance of log for operations. */
-    public static final Logger        builderLog        = LoggerFactory.getLogger(builderLogName);
-
-    /** Validation log file for operations. */
-    public static final String        validationLogName = PATH + ".Validate";
+    // Unused
+//    /** Admin log file for operations. */
+//    public static final String        builderLogName    = PATH + ".Builder";
+//
+//    /** Instance of log for operations. */
+//    public static final Logger        builderLog        = LoggerFactory.getLogger(builderLogName);
+//
+//    // Now validation uses action logger.
+//    /** Validation log file for operations. */
+//    public static final String        validationLogName = PATH + ".Validate";
 
     /** Instance of log for validation. */
     public static final Logger        validationLog     = LoggerFactory.getLogger(adminLogName);
@@ -169,10 +152,13 @@ public class Fuseki {
     /** Instance of log for general server messages. */
     public static final Logger        serverLog         = LoggerFactory.getLogger(serverLogName);
 
-    /** Logger used for the servletContent.log operations (if settable -- depends on environment) */
+    /**
+     * Logger used for the servletContent.log operations (if settable -- depends on environment).
+     * This is both the display name of the servlet context and the logger name.
+     */
     public static final String        servletRequestLogName     = PATH + ".Servlet";
 
-    /** Actual log file for config server messages. */
+    /** log for config server messages. */
     public static final String        configLogName     = PATH + ".Config";
 
     /** Instance of log for config server messages. */
@@ -196,6 +182,11 @@ public class Fuseki {
     public static final String attrNameRegistry            = "org.apache.jena.fuseki:DataAccessPointRegistry";
     public static final String attrOperationRegistry       = "org.apache.jena.fuseki:OperationRegistry";
     public static final String attrAuthorizationService    = "org.apache.jena.fuseki:AuthorizationService";
+    // The Fuseki Server
+    public static final String attrFusekiServer            = "org.apache.jena.fuseki:Server";
+    // The FusekiServerCtl object for the admin area; may be null
+    public static final String attrFusekiServerCtl         = "org.apache.jena.fuseki:ServerCtl";
+    public static final String attrMetricsProvider         = "org.apache.jena.fuseki:MetricsProvider";
 
     public static void setVerbose(ServletContext cxt, boolean verbose) {
         cxt.setAttribute(attrVerbose, Boolean.valueOf(verbose));
@@ -205,8 +196,8 @@ public class Fuseki {
         Object x = cxt.getAttribute(attrVerbose);
         if ( x == null )
             return false;
-        if ( x instanceof Boolean )
-            return (Boolean)x;
+        if ( x instanceof Boolean bool )
+            return bool.booleanValue();
         throw new FusekiException("attrVerbose: unknown object class: "+x.getClass().getName());
     }
 
@@ -225,8 +216,6 @@ public class Fuseki {
 
     // HTTP response header inserted to aid tracking.
     public static String FusekiRequestIdHeader = "Fuseki-Request-Id";
-
-    private static boolean            initialized       = false;
 
     // Server start time and uptime.
     private static final long startMillis = System.currentTimeMillis();
@@ -253,38 +242,11 @@ public class Fuseki {
     }
 
     /**
-     * Initialize an instance of the Fuseki server stack.
-     * This is not done via Jena's initialization mechanism
-     * but done explicitly to give more control.
-     * Touching this class causes this to happen
-     * (see static block at the end of this class).
-     */
-    public synchronized static void init() {
-        if ( initialized )
-            return;
-        initialized = true;
-        JenaSystem.init();
-        SystemInfo sysInfo = new SystemInfo(FusekiIRI, PATH, VERSION, BUILD_DATE);
-        SystemARQ.registerSubSystem(sysInfo);
-        MappingRegistry.addPrefixMapping("fuseki", FusekiSymbolIRI);
-
-        TDB.setOptimizerWarningFlag(false);
-        // Don't set TDB batch commits.
-        // This can be slower, but it less memory hungry and more predictable.
-        TransactionManager.QueueBatchSize = 0;
-    }
-
-    /**
      * Get server global {@link org.apache.jena.sparql.util.Context}.
      *
      * @return {@link org.apache.jena.query.ARQ#getContext()}
      */
     public static Context getContext() {
         return ARQ.getContext();
-    }
-
-    // Force a call to init.
-    static {
-        init();
     }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,8 +18,9 @@
 
 package org.apache.jena.fuseki.server;
 
+import static org.apache.jena.atlas.lib.Lib.lowercase;
+
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -28,7 +29,6 @@ import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.irix.IRIException;
 import org.apache.jena.irix.IRIx;
-import org.apache.jena.rdf.model.Resource;
 
 /**
  * Operations are symbol to look up in the {@link OperationRegistry#operationToHandler} map. The name
@@ -36,8 +36,6 @@ import org.apache.jena.rdf.model.Resource;
  * which is determined by the {@link Endpoint}.
  */
 public class Operation {
-
-    private static String NS = FusekiVocab.NS;
 
     /** Create/intern. Maps short name to operation. */
     static private Map<Node, Operation> mgr = new HashMap<>();
@@ -73,24 +71,29 @@ public class Operation {
         // Currently, (3.13.0) the JS name is the short display name in lower
         // case. Just in case it diverges in the future, leave provision for
         // a different setting.
-        return new Operation(id, shortName, shortName.toLowerCase(Locale.ROOT), description);
+        return new Operation(id, shortName, lowercase(shortName), description);
     }
 
-    public static final Operation Query    = alloc(FusekiVocab.opQuery.asNode(),  "query",  "SPARQL Query");
-    public static final Operation Update   = alloc(FusekiVocab.opUpdate.asNode(), "update", "SPARQL Update");
-    public static final Operation GSP_R    = alloc(FusekiVocab.opGSP_r.asNode(),  "gsp-r",  "Graph Store Protocol (Read)");
-    public static final Operation GSP_RW   = alloc(FusekiVocab.opGSP_rw.asNode(), "gsp-rw", "Graph Store Protocol");
+    public static final Operation Query    = alloc(FusekiVocabG.opQuery,   "query",   "SPARQL Query");
+    public static final Operation Update   = alloc(FusekiVocabG.opUpdate,  "update",  "SPARQL Update");
+    public static final Operation GSP_R    = alloc(FusekiVocabG.opGSP_r,   "gsp-r",   "Graph Store Protocol (Read)");
+    public static final Operation GSP_RW   = alloc(FusekiVocabG.opGSP_rw,  "gsp-rw",  "Graph Store Protocol");
 
-    public static final Operation Shacl    = alloc(FusekiVocab.opShacl.asNode(),  "SHACL",  "SHACL Validation");
-    public static final Operation Upload   = alloc(FusekiVocab.opUpload.asNode(), "upload", "File Upload");
-    public static final Operation Patch    = alloc(FusekiVocab.opPatch.asNode(),  "patch", "RDF Patch");
+    public static final Operation Shacl    = alloc(FusekiVocabG.opShacl,   "SHACL",   "SHACL Validation");
+    public static final Operation Upload   = alloc(FusekiVocabG.opUpload,  "upload",  "File Upload");
+    public static final Operation Patch    = alloc(FusekiVocabG.opPatch,   "patch",   "RDF Patch");
 
-    public static final Operation NoOp     = alloc(FusekiVocab.opNoOp.asNode(),   "no-op",  "No Op");
+    public static final Operation NoOp     = alloc(FusekiVocabG.opNoOp,    "no-op",   "No Op");
+
+    public static final Operation PREFIXES_R   = alloc(FusekiVocabG.opPREFIXES_R,   "prefixes-r",   "Read prefixes");
+    public static final Operation PREFIXES_RW  = alloc(FusekiVocabG.opPREFIXES_RW,  "prefixes-rw",  "Read-write prefixes");
+
+
     static {
         // Not everyone will remember "_" vs "-" so ...
-        altName(FusekiVocab.opNoOp_alt,   FusekiVocab.opNoOp);
-        altName(FusekiVocab.opGSP_r_alt,  FusekiVocab.opGSP_r);
-        altName(FusekiVocab.opGSP_rw_alt, FusekiVocab.opGSP_rw);
+        altName(FusekiVocabG.opNoOp_alt,   FusekiVocabG.opNoOp);
+        altName(FusekiVocabG.opGSP_r_alt,  FusekiVocabG.opGSP_r);
+        altName(FusekiVocabG.opGSP_rw_alt, FusekiVocabG.opGSP_rw);
     }
 
     // -- Object
@@ -154,10 +157,6 @@ public class Operation {
     @Override
     public String toString() {
         return name;
-    }
-
-    private static void altName(Resource altName, Resource properName) {
-        altName(altName.asNode(), properName.asNode());
     }
 
     private static void altName(Node altName, Node properName) {

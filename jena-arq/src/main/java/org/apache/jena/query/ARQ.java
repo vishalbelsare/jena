@@ -18,6 +18,13 @@
 
 package org.apache.jena.query;
 
+import java.net.http.HttpClient;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.jena.atlas.lib.Version;
+import org.apache.jena.cdt.CompositeDatatypeList;
+import org.apache.jena.cdt.CompositeDatatypeMap;
+import org.apache.jena.datatypes.TypeMapper;
 import org.apache.jena.http.sys.HttpRequestModifier;
 import org.apache.jena.http.sys.RegistryRequestModifier;
 import org.apache.jena.riot.RIOT;
@@ -30,17 +37,15 @@ import org.apache.jena.sparql.core.assembler.AssemblerUtils;
 import org.apache.jena.sparql.exec.http.QuerySendMode;
 import org.apache.jena.sparql.expr.aggregate.AggregateRegistry;
 import org.apache.jena.sparql.function.FunctionRegistry;
-import org.apache.jena.sparql.mgt.ARQMgt;
+import org.apache.jena.sparql.function.scripting.ScriptLangSymbols;
 import org.apache.jena.sparql.mgt.Explain;
 import org.apache.jena.sparql.mgt.Explain.InfoLevel;
-import org.apache.jena.sparql.mgt.SystemInfo;
 import org.apache.jena.sparql.pfunction.PropertyFunctionRegistry;
 import org.apache.jena.sparql.service.ServiceExecutorRegistry;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.sparql.util.MappingRegistry;
 import org.apache.jena.sparql.util.Symbol;
 import org.apache.jena.sys.JenaSystem;
-import org.apache.jena.util.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,10 +194,20 @@ public class ARQ
      * <li>A string, e.g. "1000", parsed as a number</li>
      * <li>A string, as two numbers separated by a comma, e.g. "500,10000" parsed as two numbers</li>
      * </ul>
-     * @see QueryExecution#setTimeout(long)
-     * @see QueryExecution#setTimeout(long,long)
+     * @see QueryExecutionBuilder#timeout(long, TimeUnit)
      */
     public static final Symbol queryTimeout = SystemARQ.allocSymbol("queryTimeout");
+
+    /**
+     * Set timeout.  The value of this symbol gives the value of the timeout in milliseconds
+     * <ul>
+     * <li>A Number; the long value is used</li>
+     * <li>A string, e.g. "1000", parsed as a number</li>
+     * <li>A string, as two numbers separated by a comma, e.g. "500,10000" parsed as two numbers</li>
+     * </ul>
+     * @see org.apache.jena.update.UpdateExecutionBuilder#timeout(long, TimeUnit)
+     */
+    public static final Symbol updateTimeout = SystemARQ.allocSymbol("updateTimeout");
 
     // This can't be a context constant because NodeValues don't look in the context.
 //    /**
@@ -225,18 +240,26 @@ public class ARQ
 
     /**
      * Determine which regular expression system to use.
-     * The value of this context entry should be a string or symbol
-     * of one of the following:
-     *   javaRegex :   use java.util.regex (support features outside the strict SPARQL regex language)
-     *   xercesRegex : use the internal XPath regex engine (more compliant)
+     * The value of this context entry should be a string:
+     * <ul>
+     * <li>"{@code javaRegex}" : use java.util.regex (support features outside the strict SPARQL regex language)</li>
+     * <li>"{@code xercesRegex}" : use the internal XPath regex engine (more compliant; slower)</li>
+     * </ul>
+     * The default is to use the JDK regular expression.
      */
-
     public static final Symbol regexImpl =  SystemARQ.allocSymbol("regexImpl");
 
-
-    /** Symbol to name java.util.regex regular expression engine */
+    /**
+     * Symbol to name java.util.regex regular expression engine
+     * @deprecated Use string "javaRegex"
+     */
+    @Deprecated(forRemoval = true)
     public static final Symbol javaRegex =  SystemARQ.allocSymbol("javaRegex");
-    /** Symbol to name the Xerces-J regular expression engine */
+    /**
+     * Symbol to name the Xerces-J regular expression engine
+     * @deprecated Use string "xercesRegex"
+     */
+    @Deprecated(forRemoval = true)
     public static final Symbol xercesRegex =  SystemARQ.allocSymbol("xercesRegex");
 
     /**
@@ -270,6 +293,20 @@ public class ARQ
      */
     public static final Symbol httpRequestModifer = SystemARQ.allocSymbol("httpRequestModifer");
 
+    // ---- SERVICE
+    /**
+     * Global on/off for all SERVICE calls.
+     * <p>
+     * Set {@code false} to disable SERVICE calls
+     * regardless of any context or default setting.
+     */
+    public static boolean globalServiceAllowed = true;
+
+    /**
+     * Default for whether SERVICE is enabled when no context setting {@link ARQ#httpServiceAllowed} is found.
+     */
+    public static boolean allowServiceDefault = true;
+
     /**
      * Control whether SERVICE processing is allowed.
      * If the context of the query execution contains this,
@@ -278,10 +315,17 @@ public class ARQ
     public static final Symbol httpServiceAllowed = SystemARQ.allocSymbol("httpServiceAllowed");
 
     //public static final Symbol httpQueryCompression  = SystemARQ.allocSymbol("httpQueryCompression");
+
+    /** {@link HttpClient} to use. */
     public static final Symbol httpQueryClient       = SystemARQ.allocSymbol("httpQueryClient");
-    public static final Symbol httpServiceContext    = SystemARQ.allocSymbol("httpServiceContext");
-    // Not connection timeout which is now in HttpClient
+
+    /**
+     * Operation timeout.
+     * Connection timeout is controlled via {@link java.net.http.HttpClient}.
+     */
     public static final Symbol httpQueryTimeout      = SystemARQ.allocSymbol("httpQueryTimeout");
+
+    // ----
 
     /**
      * If set to true, the parsers will convert undefined prefixes to a URI
@@ -523,14 +567,26 @@ public class ARQ
     public static final Symbol extensionValueTypes = SystemARQ.allocSymbol("extensionValueTypesExpr");
 
     /**
-     * Context symbol for JavaScript functions as a string value which is evaluated.
+     * Java system property to enable JavaScript functions
      */
-    public static Symbol symJavaScriptFunctions = SystemARQ.allocSymbol("js-functions");
+    public static final String systemPropertyScripting = "jena:scripting";
+
+    /**
+     * Context symbol for the script function allow list
+     */
+    public static final Symbol symCustomFunctionScriptAllowList = ScriptLangSymbols.scriptAllowList;
+
+    /**
+     * Context symbol for JavaScript functions as a string value which is evaluated.
+     * {@code arq:js-functions}.
+     */
+    public static Symbol symJavaScriptFunctions = ScriptLangSymbols.scriptFunctions("js");
 
     /**
      * Context symbol for JavaScript library of functions defined in a file.
+     * {@code arq:js-library}.
      */
-    public static Symbol symJavaScriptLibFile = SystemARQ.allocSymbol("js-library");
+    public static Symbol symJavaScriptLibFile = ScriptLangSymbols.scriptLibrary("js");
 
     /**
      * Generate the ToList operation in the algebra (as ARQ is stream based, ToList is a non-op).
@@ -591,21 +647,11 @@ public class ARQ
 
     // ----------------------------------
 
-    /** The root package name for ARQ */
-    public static final String PATH         = "org.apache.jena.arq";
-
-    static private String metadataLocation  = "org/apache/jena/arq/arq-properties.xml";
-
-    static private Metadata metadata        = new Metadata(metadataLocation);
-
     /** The product name */
-    public static final String NAME         = "ARQ";
+    public static final String NAME         = "Apache Jena ARQ";
 
-    /** The full name of the current ARQ version */
-    public static final String VERSION      = metadata.get(PATH+".version", "unknown");
-
-    /** The date and time at which this release was built */
-    public static final String BUILD_DATE   = metadata.get(PATH+".build.datetime", "unset");
+    /** The ARQ version */
+    public static final String VERSION      = Version.versionForClass(ARQ.class).orElse("<development>");
 
     /**
      * Ensure things have started - applications do not need call this.
@@ -628,12 +674,8 @@ public class ARQ
             ResultSetLang.init();
             // Done as a class init.
             //globalContext = defaultSettings();
-            ARQMgt.init();         // After context and after PATH/NAME/VERSION/BUILD_DATE are set
             MappingRegistry.addPrefixMapping(ARQ.arqSymbolPrefix, ARQ.arqParamNS);
 
-            // This is the pattern for any subsystem to register.
-            SystemInfo sysInfo = new SystemInfo(ARQ.arqIRI, ARQ.PATH, ARQ.VERSION, ARQ.BUILD_DATE);
-            SystemARQ.registerSubSystem(sysInfo);
             AssemblerUtils.init();
             // Register RIOT details here, not earlier, to avoid
             // initialization loops with RIOT.init() called directly.
@@ -643,6 +685,10 @@ public class ARQ
             ServiceExecutorRegistry.init();
             AggregateRegistry.init();
             PropertyFunctionRegistry.init();
+
+            // Register the datatypes for the CDT literals
+            TypeMapper.getInstance().registerDatatype(CompositeDatatypeList.type) ;
+            TypeMapper.getInstance().registerDatatype(CompositeDatatypeMap.type) ;
 
             JenaSystem.logLifecycle("ARQ.init - finish");
         }

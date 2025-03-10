@@ -47,7 +47,7 @@ import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprList;
 import org.apache.jena.sparql.procedure.ProcEval;
 import org.apache.jena.sparql.procedure.Procedure;
-import org.apache.jena.sparql.service.ServiceExecutorRegistry;
+import org.apache.jena.sparql.service.ServiceExec;
 
 /**
  * Turn an Op expression into an execution of QueryIterators. Does not consider
@@ -145,7 +145,7 @@ public class OpExecutor {
         // default graph and union graph.
 
         if ( Quad.isDefaultGraph(gn) ) {
-            ExecutionContext cxt2 = new ExecutionContext(execCxt, execCxt.getDataset().getDefaultGraph());
+            ExecutionContext cxt2 = ExecutionContext.copyChangeActiveGraph(execCxt, execCxt.getDataset().getDefaultGraph());
             return execute(subOp, input, cxt2);
         }
 
@@ -308,7 +308,7 @@ public class OpExecutor {
     }
 
     protected QueryIterator execute(OpService opService, QueryIterator input) {
-        return ServiceExecutorRegistry.exec(input, opService, execCxt);
+        return ServiceExec.exec(opService, input, execCxt);
     }
 
     // Quad form, "GRAPH ?g {}" Flip back to OpGraph.
@@ -391,7 +391,7 @@ public class OpExecutor {
 
         if ( input instanceof QueryIterRoot ) {
             QueryIterator qIter = exec(opProject.getSubOp(), input);
-            qIter = new QueryIterProject(qIter, opProject.getVars(), execCxt);
+            qIter = QueryIterProject.create(qIter, opProject.getVars(), execCxt);
             return qIter;
         }
         // Nested projected : need to ensure the input is seen.
@@ -447,6 +447,12 @@ public class OpExecutor {
         // the same as extend. The boolean should only be a check.
         QueryIterator qIter = exec(opExtend.getSubOp(), input);
         qIter = new QueryIterAssign(qIter, opExtend.getVarExprList(), execCxt, true);
+        return qIter;
+    }
+
+    protected QueryIterator execute(OpUnfold opUnfold, QueryIterator input) {
+        QueryIterator qIter = exec(opUnfold.getSubOp(), input);
+        qIter = new QueryIterUnfold(qIter, opUnfold.getExpr(), opUnfold.getVar1(), opUnfold.getVar2(), execCxt);
         return qIter;
     }
 

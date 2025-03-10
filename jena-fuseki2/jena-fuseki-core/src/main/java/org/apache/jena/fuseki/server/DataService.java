@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,7 +20,7 @@ package org.apache.jena.fuseki.server;
 
 import static java.lang.String.format;
 import static org.apache.jena.fuseki.server.DataServiceStatus.*;
-import static org.apache.jena.tdb.sys.TDBInternal.isTDB1;
+import static org.apache.jena.tdb1.sys.TDBInternal.isTDB1;
 import static org.apache.jena.tdb2.sys.TDBInternal.isTDB2;
 
 import java.util.*;
@@ -28,8 +28,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-import org.apache.jena.ext.com.google.common.collect.ArrayListMultimap;
-import org.apache.jena.ext.com.google.common.collect.ListMultimap;
+import org.apache.commons.collections4.ListValuedMap;
+import org.apache.commons.collections4.MultiMapUtils;
+import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.FusekiException;
 import org.apache.jena.fuseki.auth.AuthPolicy;
@@ -40,12 +41,15 @@ import org.apache.jena.riot.out.NodeFmtLib;
 import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sparql.core.DatasetGraphWrapper;
 
+/**
+ * A {@code DataService} is the fuseki Service in a configuration file.
+ */
 public class DataService {
     // Not final - it is null'ed if closed to release the dataset state.
     private DatasetGraph dataset;
 
     private final Map<String, EndpointSet> endpoints;
-    private final ListMultimap<Operation, Endpoint> operationsMap;
+    private final ListValuedMap<Operation, Endpoint> operationsMap;
 
     // Dataset-level authorization policy.
     private final AuthPolicy authPolicy;
@@ -81,12 +85,13 @@ public class DataService {
 
     /** Create a {@code DataService} for the given dataset. */
     private DataService(DatasetGraph dataset, Map<String, EndpointSet> endpoints,
-                        ListMultimap<Operation, Endpoint> operationsMap,
+                        MultiValuedMap<Operation, Endpoint> operationsMap,
                         DispatchFunction plainOperationChooser,
                         AuthPolicy authPolicy) {
         this.dataset = dataset;
         this.endpoints = Map.copyOf(endpoints);
-        this.operationsMap = ArrayListMultimap.create(operationsMap);
+        this.operationsMap = MultiMapUtils.newListValuedHashMap();
+        this.operationsMap.putAll(operationsMap);
         this.plainOperationChooser = plainOperationChooser;
         this.authPolicy = authPolicy;
         counters.add(CounterName.Requests);
@@ -228,10 +233,16 @@ public class DataService {
     /** Cumulative counter of transactions */
     public AtomicLong   totalTxn            = new AtomicLong(0);
 
+    /** Note the start of a transaction */
     public void startTxn(TxnType mode) {
         check(DataServiceStatus.ACTIVE);
         activeTxn.getAndIncrement();
         totalTxn.getAndIncrement();
+    }
+
+    /** Note the finish of a transaction */
+    public void finishTxn() {
+        activeTxn.decrementAndGet();
     }
 
     private void check(DataServiceStatus status) {
@@ -239,10 +250,6 @@ public class DataService {
             String msg = format("DataService %s: Expected=%s, Actual=%s", label(), status, state);
             throw new FusekiException(msg);
         }
-    }
-
-    public void finishTxn() {
-        activeTxn.decrementAndGet();
     }
 
     /** Shutdown and never use again. */
@@ -276,7 +283,7 @@ public class DataService {
         if ( isTDB1 || isTDB2 ) {
             // JENA-1586: Remove database from the process.
             if ( isTDB1 )
-                org.apache.jena.tdb.sys.TDBInternal.expel(base);
+                org.apache.jena.tdb1.sys.TDBInternal.expel(base);
             if ( isTDB2 )
                 org.apache.jena.tdb2.sys.TDBInternal.expel(base);
         }
@@ -302,7 +309,7 @@ public class DataService {
         private DatasetGraph dataset = null;
 
         private Map<String, EndpointSet> endpoints              = new HashMap<>();
-        private ListMultimap<Operation, Endpoint> operationsMap = ArrayListMultimap.create();
+        private ListValuedMap<Operation, Endpoint> operationsMap = MultiMapUtils.newListValuedHashMap();
         private DispatchFunction plainOperationChooser  = null;
 
         // Dataset-level authorization policy.
@@ -311,7 +318,7 @@ public class DataService {
         private Builder() {}
 
         private Builder(DatasetGraph dataset, Map<String, EndpointSet> endpoints,
-                        ListMultimap<Operation, Endpoint> operationsMap,
+                        MultiValuedMap<Operation, Endpoint> operationsMap,
                         DispatchFunction plainOperationChooser,
                         AuthPolicy authPolicy) {
             this();
@@ -360,7 +367,7 @@ public class DataService {
             EndpointSet eps = endpoints.computeIfAbsent(endpoint.getName(), (k)->new EndpointSet(k));
             eps.put(endpoint);
             // Cleaner not to have duplicates. But nice to have a (short) list that keeps the create order.
-            if ( ! operationsMap.containsEntry(endpoint.getOperation(), endpoint) )
+            if ( ! operationsMap.containsMapping(endpoint.getOperation(), endpoint) )
                 operationsMap.put(endpoint.getOperation(), endpoint);
             return this;
         }
@@ -370,7 +377,7 @@ public class DataService {
             if ( eps == null )
                 return;
             eps.remove(endpoint);
-            operationsMap.remove(endpoint.getOperation(), endpoint);
+            operationsMap.removeMapping(endpoint.getOperation(), endpoint);
         }
 
         public Builder setPlainOperationChooser(DispatchFunction plainOperationChooser) {

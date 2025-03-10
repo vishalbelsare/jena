@@ -29,28 +29,11 @@ import org.apache.jena.sparql.util.Context;
  */
 public interface QueryExecMod {
 
-    public default QueryExecMod timeout(long timeout, TimeUnit timeoutUnits) {
-        overallTimeout(timeout, timeoutUnits);
-        return this;
-    }
+    // All "return QueryExec" These need overriding and returning the implementation class.
 
-    public default QueryExecMod timeout(long timeout) {
-        return timeout(timeout, TimeUnit.MILLISECONDS);
-    }
+    public QueryExecMod timeout(long timeout, TimeUnit timeoutUnits);
 
-    // [QExec]
-    // Remove these, leave only the explicit names?
-    // Legacy issues?
-    // QueryExecutionAdapter has the names and translation.
-//    public default QueryExecMod timeout(long timeout1, TimeUnit timeUnit1, long timeout2, TimeUnit timeUnit2) {
-//        initialTimeout(timeout1, timeUnit1);
-//        overallTimeout(timeout2, timeUnit2);
-//        return this;
-//    }
-//
-//    public default QueryExecMod timeout(long timeout1, long timeout2) {
-//        return timeout(timeout1, TimeUnit.MILLISECONDS, timeout2, TimeUnit.MILLISECONDS);
-//    }
+    public QueryExecMod timeout(long timeout);
 
     public QueryExecMod initialTimeout(long timeout, TimeUnit timeUnit);
 

@@ -21,8 +21,7 @@
   <parent>
     <groupId>org.apache.jena</groupId>
     <artifactId>jena-fuseki</artifactId>
-    <version>4.8.0-SNAPSHOT</version>
-    <relativePath>../</relativePath>
+    <version>5.4.0-SNAPSHOT</version>
   </parent>
 
   <name>Apache Jena - Fuseki Webapp</name>
@@ -38,13 +37,13 @@
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-fuseki-core</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-fuseki-core</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
       <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
@@ -52,28 +51,56 @@
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-cmds</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
     </dependency>
    
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-text</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
     </dependency>
     
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-webapp</artifactId>
+      <groupId>org.eclipse.jetty.ee10</groupId>
+      <artifactId>jetty-ee10-webapp</artifactId>
     </dependency>
 
+    <!-- Shiro -->
+    
     <dependency>
       <groupId>org.apache.shiro</groupId>
       <artifactId>shiro-core</artifactId>
+      <classifier>jakarta</classifier>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.apache.shiro</groupId>
+      <artifactId>shiro-web</artifactId>
+      <classifier>jakarta</classifier>
     </dependency>
 
     <dependency>
       <groupId>org.apache.shiro</groupId>
-      <artifactId>shiro-web</artifactId>
+      <artifactId>shiro-config-core</artifactId>
+    </dependency>
+
+    <!-- See https://shiro.apache.org/jakarta-ee.html -->
+    <dependency>
+      <groupId>org.apache.shiro</groupId>
+      <artifactId>shiro-jakarta-ee</artifactId>
+      <classifier>jakarta</classifier>
+      <exclusions>
+        <exclusion>
+          <groupId>org.omnifaces</groupId>
+          <artifactId>omnifaces</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- Include omnifaces -->
+    <dependency>
+      <groupId>org.omnifaces</groupId>
+      <artifactId>omnifaces</artifactId>
+      <version>${ver.omnifaces}</version>
     </dependency>
 
     <!-- frontend assets (HTML, JS, CSS, images, etc.) -->
@@ -88,7 +115,7 @@
     <!-- Logging  -->  
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
+      <artifactId>log4j-slf4j2-impl</artifactId>
     </dependency>
 
     <!-- Within-webapp use -->
@@ -101,7 +128,7 @@
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-arq</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
       <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
@@ -109,14 +136,32 @@
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-base</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>5.4.0-SNAPSHOT</version>
       <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
 
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
       <scope>test</scope>
     </dependency>
 

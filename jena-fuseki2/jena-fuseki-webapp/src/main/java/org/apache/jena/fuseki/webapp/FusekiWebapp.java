@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -37,7 +37,6 @@ import org.apache.jena.cmd.CmdException;
 import org.apache.jena.dboe.sys.Names;
 import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.FusekiConfigException;
-import org.apache.jena.fuseki.build.DatasetDescriptionMap;
 import org.apache.jena.fuseki.build.FusekiConfig;
 import org.apache.jena.fuseki.cmd.FusekiArgs;
 import org.apache.jena.fuseki.mgt.Template;
@@ -47,6 +46,7 @@ import org.apache.jena.fuseki.server.DataAccessPointRegistry;
 import org.apache.jena.fuseki.server.DataService;
 import org.apache.jena.fuseki.servlets.HttpAction;
 import org.apache.jena.fuseki.servlets.ServletOps;
+import org.apache.jena.fuseki.system.FusekiCore;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.rdfs.RDFSFactory;
@@ -56,6 +56,7 @@ import org.apache.jena.riot.RDFLanguages;
 import org.apache.jena.riot.RDFParser;
 import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sparql.core.assembler.AssemblerUtils;
+import org.apache.jena.sys.JenaSystem;
 
 public class FusekiWebapp
 {
@@ -123,7 +124,8 @@ public class FusekiWebapp
             Path FUSEKI_HOME = FusekiEnv.FUSEKI_HOME;
             Path FUSEKI_BASE = FusekiEnv.FUSEKI_BASE;
 
-            Fuseki.init();
+            JenaSystem.init();
+            FusekiCore.init();
             Fuseki.configLog.info("FUSEKI_HOME="+ ((FUSEKI_HOME==null) ? "unset" : FUSEKI_HOME.toString()));
             Fuseki.configLog.info("FUSEKI_BASE="+FUSEKI_BASE.toString());
 
@@ -219,12 +221,9 @@ public class FusekiWebapp
     public static void initializeDataAccessPoints(DataAccessPointRegistry registry, FusekiArgs initialSetup, String configDir) {
         List<DataAccessPoint> configFileDBs = initServerConfiguration(initialSetup);
         List<DataAccessPoint> directoryDBs =  FusekiConfig.readConfigurationDirectory(configDir);
-        List<DataAccessPoint> systemDBs =     FusekiConfig.readSystemDatabase(SystemState.getDataset());
-
         List<DataAccessPoint> datapoints = new ArrayList<>();
         datapoints.addAll(configFileDBs);
         datapoints.addAll(directoryDBs);
-        datapoints.addAll(systemDBs);
 
         datapoints.forEach(registry::register);
     }
@@ -285,7 +284,6 @@ public class FusekiWebapp
 
     private static DataAccessPoint configFromTemplate(String templateFile, String datasetPath,
                                                       boolean allowUpdate, Map<String, String> params) {
-        DatasetDescriptionMap registry = new DatasetDescriptionMap();
         // ---- Setup
         if ( params == null ) {
             params = new HashMap<>();
@@ -312,9 +310,9 @@ public class FusekiWebapp
 
         String str = TemplateFunctions.templateFile(templateFile, params, Lang.TTL);
         Lang lang = RDFLanguages.filenameToLang(templateFile, Lang.TTL);
-        Model model = RDFParser.fromString(str).base(datasetPath).lang(lang).toModel();
+        Model model = RDFParser.fromString(str, lang).base(datasetPath).toModel();
 
-        List<DataAccessPoint> defns = FusekiConfig.servicesAndDatasets(model);
+        List<DataAccessPoint> defns = FusekiConfig.servicesAndDatasets(model.getGraph());
         if ( defns.size() != 1 ) {
             if ( defns.isEmpty() )
                 ServletOps.errorBadRequest("No description of a Fuseki service");

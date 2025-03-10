@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,12 +27,9 @@ public class RDFReaderFactoryRIOT implements RDFReaderF {
     public RDFReaderFactoryRIOT() {}
 
     @Override
-    public RDFReaderI getReader() {
-        return getReader(RDFReaderFImpl.DEFAULTLANG);
-    }
-
-    @Override
     public RDFReaderI getReader(String langname) {
+        if ( langname == null )
+            langname = RDFReaderFImpl.DEFAULTLANG;
         // For RIOT, the language name is a hint.
         return new RDFReaderRIOT(langname);
     }

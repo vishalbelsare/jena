@@ -28,38 +28,53 @@ import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFParser;
+import org.apache.jena.riot.RDFParserBuilder;
 import org.apache.jena.riot.SysRIOT;
+import org.apache.jena.riot.lang.rdfxml.RRX;
 import org.apache.jena.riot.system.ErrorHandlerFactory;
 import org.junit.Test;
 
+/**
+ * Tests for setting reader properties - specific to ARP0 and ARP1.
+ */
+@SuppressWarnings("removal")
 public class TestRDFXML_ReaderProperties {
-    @Test public void rdfxmlreaderProperties1() {
+    @Test public void rdfxmlreaderProperties_arp0() {
+        execTest(RRX.RDFXML_ARP0);
+    }
+
+    @Test public void rdfxmlreaderProperties_arp1() {
+        execTest(RRX.RDFXML_ARP0);
+    }
+
+    private void execTest(Lang parserLang) {
         // Inline illustrative data.
         String data = StrUtils.strjoinNL
-            ("<?xml version=\"1.0\" encoding=\"utf-8\"?>"
-            ,"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\""
-            ,"         xmlns:ex=\"http://examples.org/\">"
-            // This rdf:ID starts with a digit which normal causes a warning.
-            ,"  <ex:Type rdf:ID='012345'></ex:Type>"
-            ,"</rdf:RDF>"
-            );
+                ("<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+                ,"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\""
+               ,"         xmlns:ex=\"http://examples.org/\""
+               ,"         xml:base=\"http://example/\""
+               ,"         >"
+                // This rdf:ID starts with a digit which normally causes a warning.
+                ,"  <ex:Type rdf:ID='012345'></ex:Type>"
+                ,"</rdf:RDF>"
+                );
+
 
         // Properties to be set.
         // This is a map propertyName->value
         Map<String, Object> properties = new HashMap<>();
-        // See class ARPErrorNumbers for the possible ARP properies.
+        // See class ARPErrorNumbers for the possible ARP properties.
         properties.put("WARN_BAD_NAME", "EM_IGNORE");
 
         Model model = ModelFactory.createDefaultModel();
         // Build and run a parser
-        RDFParser.fromString(data)
-            .lang(Lang.RDFXML)
+        RDFParserBuilder builder = RDFParser.fromString(data, parserLang)
             // Put a properties object into the Context.
             .set(SysRIOT.sysRdfReaderProperties, properties)
             // Exception on warning or error.
-            .errorHandler(ErrorHandlerFactory.errorHandlerExceptions())
-            .parse(model);
-
+            .errorHandler(ErrorHandlerFactory.errorHandlerExceptions());
+        builder.parse(model);
         assertEquals(1, model.size());
     }
 }

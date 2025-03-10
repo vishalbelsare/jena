@@ -18,10 +18,23 @@
 
 package org.apache.jena.assembler;
 
-import java.util.*;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.RDFList;
+import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.Statement;
+import org.apache.jena.rdf.model.StmtIterator;
+import org.apache.jena.vocabulary.OWL;
+import org.apache.jena.vocabulary.RDF;
+import org.apache.jena.vocabulary.RDFS;
 
-import org.apache.jena.rdf.model.* ;
-import org.apache.jena.vocabulary.* ;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 
 /**
      The ModelExpansion code expands a model <code>M</code> against a 
@@ -295,7 +308,7 @@ public class ModelExpansion
         @Override
         public String toString()
             {
-            StringBuffer result = new StringBuffer( "[" );
+            StringBuilder result = new StringBuilder( "[" );
             LinkedSeq scan = this;
             while (scan != null) { result.append( scan.item ); scan = scan.rest; result.append( " " ); }
             return result.append( "]" ).toString();

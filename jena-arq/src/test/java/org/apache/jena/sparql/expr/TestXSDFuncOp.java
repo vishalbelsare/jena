@@ -28,6 +28,7 @@ import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.query.ARQ;
 import org.apache.jena.sparql.expr.nodevalue.*;
 import org.apache.jena.sparql.sse.SSE;
+import org.apache.jena.sparql.util.XSDNumUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -97,7 +98,7 @@ public class TestXSDFuncOp {
     }
 
     private static void lex_decimal_value(BigDecimal decimal, String expected) {
-        String lex = XSDFuncOp.canonicalDecimalStr(decimal);
+        String lex = XSDNumUtils.stringFormatARQ(decimal);
         assertEquals(expected, lex);
     }
 
@@ -109,7 +110,7 @@ public class TestXSDFuncOp {
 
     private static void lex_decimal_canonical(String input, String expected) {
         BigDecimal decimal = new BigDecimal(input);
-        String lex = XSDFuncOp.canonicalDecimalStr(decimal);
+        String lex = XSDNumUtils.stringFormatARQ(decimal);
         assertEquals(expected, lex);
     }
 
@@ -659,7 +660,7 @@ public class TestXSDFuncOp {
     }
 
     @Test public void testCompareGeneral3() {
-        NodeValue nv1 = NodeValue.makeNode(NodeFactory.createLiteral("test:abc"));
+        NodeValue nv1 = NodeValue.makeNode(NodeFactory.createLiteralString("test:abc"));
         NodeValue nv2 = NodeValue.makeNode(NodeFactory.createURI("test:abc"));
 
         // URIs before literals

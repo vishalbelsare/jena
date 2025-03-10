@@ -20,9 +20,10 @@ package org.apache.jena.cmd;
 
 import java.util.ArrayList;
 import java.util.List;
+
 public abstract class CmdArgModule extends CmdMain
 {
-    List<ArgModuleGeneral> modules = new ArrayList<>();
+    private List<ArgModuleGeneral> modules = new ArrayList<>();
 
     protected CmdArgModule(String[] argv) {
         super(argv);

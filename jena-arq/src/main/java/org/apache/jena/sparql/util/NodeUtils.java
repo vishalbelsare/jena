@@ -20,14 +20,16 @@ package org.apache.jena.sparql.util;
 
 import java.util.*;
 
-import org.apache.jena.atlas.lib.ListUtils;
 import org.apache.jena.atlas.lib.SetUtils;
 import org.apache.jena.datatypes.RDFDatatype ;
 import org.apache.jena.datatypes.xsd.XSDDatatype ;
 import org.apache.jena.graph.Node ;
 import org.apache.jena.graph.NodeFactory ;
-import org.apache.jena.irix.IRIx;
+import org.apache.jena.graph.Triple;
 import org.apache.jena.rdf.model.impl.Util;
+import org.apache.jena.riot.system.StreamRDF;
+import org.apache.jena.riot.system.StreamRDFWrapper;
+import org.apache.jena.sparql.core.Quad;
 import org.apache.jena.sparql.expr.ExprEvalException ;
 import org.apache.jena.sparql.expr.NodeValue ;
 import org.apache.jena.sparql.expr.nodevalue.NodeFunctions ;
@@ -40,15 +42,6 @@ import org.apache.jena.util.iterator.WrappedIterator ;
  */
 public class NodeUtils
 {
-    /**
-     * IRI to Node
-     * @deprecated Do not use org.apache.jena.iri.IRI. Use {@link IRIx}.
-     */
-    @Deprecated
-    public static Node asNode(org.apache.jena.iri.IRI iri) {
-        return NodeFactory.createURI(iri.toString()) ;
-    }
-
     /** IRI string to Node */
     public static Node asNode(String iri) {
         return NodeFactory.createURI(iri) ;
@@ -117,18 +110,8 @@ public class NodeUtils
 
     /** Convert strings to a List of {@link Node Nodes}. */
     public static List<Node> convertToListNodes(List<String> namedGraphs) {
-        List<Node> nodes = ListUtils.toList(
-            namedGraphs.stream().map(NodeFactory::createURI)
-            );
+        List<Node> nodes = namedGraphs.stream().map(NodeFactory::createURI).toList();
         return nodes;
-    }
-
-    /**
-     * @deprecated Use {@link NodeCmp#compareRDFTerms(Node, Node)}
-     */
-    @Deprecated
-    public static int compareRDFTerms(Node node1, Node node2) {
-        return NodeCmp.compareRDFTerms(node1, node2);
     }
 
     // --- Equality tests.
@@ -205,4 +188,66 @@ public class NodeUtils
      */
     public static boolean isLangString(Node n) { return Util.isLangString(n) ; }
 
+    /**
+     * Determines whether a triple (as s/p/o) is valid as a RDF statement.
+     * <p>
+     * This function reflects the fact that the {@link Triple} API is flexible in
+     * allowing any Node type in any position (including non-RDF node types like
+     * Variable) and as such not all Triples can be safely converted into Statements
+     * </p>
+     * @param s Subject
+     * @param p Predicate
+     * @param o Object
+     * @return True if a valid as a statement
+     */
+    public static boolean isValidAsRDF(Node s, Node p, Node o) {
+        if ( s == null || ( ! s.isBlank() && ! s.isURI() ) )
+            return false;
+        if ( p == null || ( ! p.isURI() ) )
+            return false;
+        if ( o == null || ( ! o.isBlank() && ! o.isURI() && ! o.isLiteral() && !o.isNodeTriple() ) )
+            return false;
+        return true;
+    }
+
+    /**
+     * Determines whether a quad (as g/s/p/o) is valid as a RDF statement.
+     * <p>
+     * This function reflects the fact that the {@link Triple} API is flexible in
+     * allowing any Node type in any position (including non-RDF node types like
+     * Variable) and as such not all Triples can be safely converted into Statements
+     * </p>
+     * @param s Subject
+     * @param p Predicate
+     * @param o Object
+     * @return True if a valid as a statement
+     */
+    public static boolean isValidAsRDF(Node g, Node s, Node p, Node o) {
+        if ( g == null || ( ! g.isURI() && ! g.isBlank() ) )
+            return false;
+        return isValidAsRDF(s, p, o);
+    }
+
+    /** Filter out triples and quads that are "generalized" RDF */
+    public static StreamRDF removeGeneralizedRDF(StreamRDF data) {
+        return new StreamRDFWrapper(data) {
+            @Override
+            public void quad(Quad quad) {
+                if ( ! isValidAsRDF(quad.getGraph(), quad.getSubject(), quad.getPredicate(), quad.getObject()) ) {
+                    // Reject
+                    return;
+                }
+                super.quad(quad);
+            }
+
+            @Override
+            public void triple(Triple triple) {
+                if ( ! isValidAsRDF(triple.getSubject(), triple.getPredicate(), triple.getObject()) ) {
+                    // Reject
+                    return;
+                }
+                super.triple(triple);
+            }
+        };
+    }
 }

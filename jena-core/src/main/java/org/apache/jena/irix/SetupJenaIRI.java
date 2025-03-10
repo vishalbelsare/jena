@@ -64,7 +64,7 @@ public class SetupJenaIRI {
         // Allow relative references for file: URLs.
         iriCheckerFactory.setSameSchemeRelativeReferences("file");
 
-        // See also Checker.iriViolations and IRProviderJenaIRI where this is restricted to the scheme component.
+        // See also IRIProviderJenaIRI where this is restricted to the scheme component.
         setErrorWarning(iriCheckerFactory, ViolationCodes.LOWERCASE_PREFERRED, false, true);
         // Jena3 compatibility (false, false) for this one.
         setErrorWarning(iriCheckerFactory, ViolationCodes.PERCENT_ENCODING_SHOULD_BE_UPPERCASE, false, false);
@@ -99,9 +99,11 @@ public class SetupJenaIRI {
         setErrorWarning(iriCheckerFactory, ViolationCodes.NON_INITIAL_DOT_SEGMENT, false, false);
 
         // == Character related.
-        //setErrorWarning(iriFactoryInst, ViolationCodes.NOT_NFC,  false, false);
+        // Causes confusion! And this is only advice in RDF Concepts.
+        setErrorWarning(iriCheckerFactory, ViolationCodes.NOT_NFC,  false, false);
         // NFKC is not mentioned in RDF 1.1. Switch off.
         setErrorWarning(iriCheckerFactory, ViolationCodes.NOT_NFKC, false, false);
+        // The MAYBE ViolationCodes are never generated.
 
         // ** Applies to various unicode blocks.
 

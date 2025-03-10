@@ -25,15 +25,33 @@
     <parent>
         <groupId>org.apache.jena</groupId>
         <artifactId>jena-fuseki</artifactId>
-        <version>4.8.0-SNAPSHOT</version>
-        <relativePath>..</relativePath>
+        <version>5.4.0-SNAPSHOT</version>
     </parent>
 
     <properties>
-        <node.version>v16.13.1</node.version>
+        <node.version>v20.11.0</node.version>
         <yarn.version>v1.22.17</yarn.version>
         <automatic.module.name>org.apache.jena.fuseki.ui</automatic.module.name>
+
+        <!-- 
+             Allow for skipping the tests.
+             The test frameworks need various software compoents to 
+             be available on the host running maven. This isn't always 
+             practical. This property allows the UI to be built on such machines
+             by skipping the tests.
+             It is set "true" by profile "ui-skip-tests"
+        -->
+        <skip.ui.tests>false</skip.ui.tests>
+
     </properties>
+    <profiles>
+      <profile>
+        <id>ui-skip-tests</id>
+        <properties>
+          <skip.ui.tests>true</skip.ui.tests>
+        </properties>
+    </profile>
+    </profiles>
 
     <build>
         <plugins>
@@ -41,7 +59,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <id>reserve-network-port</id>
@@ -62,7 +80,7 @@
             <plugin>
                 <groupId>com.github.eirslett</groupId>
                 <artifactId>frontend-maven-plugin</artifactId>
-                <version>1.12.1</version>
+                <version>1.15.1</version>
                 <executions>
                     <execution>
                         <id>install node and yarn</id>
@@ -99,6 +117,7 @@
                         </goals>
                         <phase>test</phase>
                         <configuration>
+                            <skip>${skip.ui.tests}</skip>
                             <arguments>run test:unit</arguments>
                         </configuration>
                     </execution>
@@ -109,7 +128,7 @@
                         </goals>
                         <phase>test</phase>
                         <configuration>
-                            <testFailureIgnore>true</testFailureIgnore>
+                            <skip>${skip.ui.tests}</skip>
                             <environmentVariables>
                                 <PORT>${org.apache.jena.fuseki.ui.port}</PORT>
                                 <FUSEKI_PORT>${org.apache.jena.fuseki.port}</FUSEKI_PORT>

@@ -17,87 +17,196 @@
  */
 
 package org.apache.jena.cmds;
-import java.util.Iterator ;
 
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
+
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Arrays;
+import java.util.Iterator;
+
+import org.apache.jena.cmd.Arg;
+import org.apache.jena.cmd.Args;
 import org.apache.jena.cmd.ArgDecl;
+import org.apache.jena.cmd.CmdException;
 import org.apache.jena.cmd.CmdLineArgs;
-import org.junit.Test ;
-import static org.junit.Assert.* ;
 
-public class TestCmdLine
-{
-    @Test public void test_Simple1()
-    {
-        String args[] = new String[]{""} ;
-        CmdLineArgs cl = new CmdLineArgs(args) ;
-        cl.process() ;
-    }
-    
-    @Test public void test_Flag1()
-    {
-        String args[] = new String[]{ ""} ;
-        CmdLineArgs cl = new CmdLineArgs(args) ;
-        ArgDecl argA = new ArgDecl(false, "-a") ;
-        cl.add(argA) ;
-        cl.process() ;
-        assertTrue("-a argument found" , ! cl.contains(argA) ) ; 
-    }
-    
-    @Test public void test_Flag2()
-    {
-        String args[] = new String[]{ "-a"} ;
-        CmdLineArgs cl = new CmdLineArgs(args) ;
-        ArgDecl argA = new ArgDecl(false, "-a") ;
-        cl.add(argA) ;
-        cl.process() ;
-        assertTrue("No -a argument found" , cl.contains(argA) ) ; 
+public class TestCmdLine {
+
+    private static String DIR = "testing/cmd/";
+
+    @Test
+    public void test_Simple1() {
+        String args[] = {""};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        cl.process();
     }
 
-    @Test public void test_Flag3()
-    {
-        String args[] = new String[]{ "-a", "filename"} ;
-        CmdLineArgs cl = new CmdLineArgs(args) ;
-        ArgDecl argA = new ArgDecl(false, "-a") ;
-        cl.add(argA) ;
-        cl.process() ;
-        assertTrue("No -a argument found" , cl.contains(argA) ) ; 
+    @Test
+    public void test_Flag1() {
+        String args[] = {""};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        ArgDecl argA = new ArgDecl(false, "-a");
+        cl.add(argA);
+        cl.process();
+        assertTrue("-a argument found", !cl.contains(argA));
     }
-    
-    @Test public void test_Arg1()
-    {
-        String args[] = new String[]{ ""} ;
-        CmdLineArgs cl = new CmdLineArgs(args) ;
-        ArgDecl argA = new ArgDecl(true, "-arg") ;
-        cl.add(argA) ;
-        cl.process() ;
-        assertTrue("-arg argument found" , ! cl.contains(argA) ) ; 
+
+    @Test
+    public void test_Flag2() {
+        String args[] = {"-a"};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        ArgDecl argA = new ArgDecl(false, "-a");
+        cl.add(argA);
+        cl.process();
+        assertTrue("No -a argument found", cl.contains(argA));
     }
-    
-    @Test public void test_Arg2()
-    {
-        String args[] = new String[]{ "-arg=ARG", "filename"} ;
-        CmdLineArgs cl = new CmdLineArgs(args) ;
-        ArgDecl argA = new ArgDecl(true, "arg") ;
-        cl.add(argA) ;
-        cl.process() ;
-        assertTrue("No -arg= argument found" , cl.contains(argA) ) ; 
-        assertEquals("", cl.getValue(argA) , "ARG") ;
-        assertEquals("", cl.getArg("arg").getValue() , "ARG") ;
+
+    @Test
+    public void test_Flag3() {
+        String args[] = {"-a", "filename"};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        ArgDecl argA = new ArgDecl(false, "-a");
+        cl.add(argA);
+        cl.process();
+        assertTrue("No -a argument found", cl.contains(argA));
     }
-    
-    @Test public void test_nArg1()
-    {
-        String args[] = new String[]{ "-arg=V1", "--arg=V2", "-v"} ;
-        CmdLineArgs cl = new CmdLineArgs(args) ;
-        ArgDecl argA = new ArgDecl(true, "-arg") ;
-        cl.add(argA) ;
-        ArgDecl argV = new ArgDecl(false, "-v") ;
-        cl.add(argV) ;
-        cl.process() ;
-        assertTrue("No -arg= argument found" , cl.contains(argA) ) ;
-        
-        Iterator<String> iter = cl.getValues("arg").iterator() ;
-        assertEquals("Argument 1", iter.next() , "V1") ;
-        assertEquals("Argument 2", iter.next() , "V2") ;
+
+    @Test
+    public void test_Arg1() {
+        String args[] = {""};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        ArgDecl argA = new ArgDecl(true, "-arg");
+        cl.add(argA);
+        cl.process();
+        assertTrue("-arg argument found", !cl.contains(argA));
     }
+
+    @Test
+    public void test_Arg2() {
+        String args[] = {"-arg=ARG", "filename"};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        ArgDecl argA = new ArgDecl(true, "arg");
+        cl.add(argA);
+        cl.process();
+        assertTrue("No -arg= argument found", cl.contains(argA));
+        assertEquals("", cl.getValue(argA), "ARG");
+        assertEquals("", cl.getArg("arg").getValue(), "ARG");
+    }
+
+    @Test
+    public void test_nArg1() {
+        String args[] = {"-arg=V1", "--arg=V2", "-v"};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        ArgDecl argA = new ArgDecl(true, "-arg");
+        cl.add(argA);
+        ArgDecl argV = new ArgDecl(false, "-v");
+        cl.add(argV);
+        cl.process();
+        assertTrue("No -arg= argument found", cl.contains(argA));
+
+        Iterator<String> iter = cl.getValues("arg").iterator();
+        assertEquals("Argument 1", iter.next(), "V1");
+        assertEquals("Argument 2", iter.next(), "V2");
+    }
+
+    public void test_addSetting() {
+        String args[] = {};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        cl.process();
+        cl.addArg("extra", "value");
+        Arg a = cl.getArg("extra");
+        assertNotNull(a);
+    }
+
+
+    @Test
+    public void test_removeArg1() {
+        String args[] = {"--arg=V1", "-v"};
+        CmdLineArgs cl = new CmdLineArgs(args);
+        ArgDecl argA = new ArgDecl(true, "argument", "arg");
+        cl.add(argA);
+        cl.removeArg(argA);
+        // Exception.
+        assertThrows(CmdException.class, ()->cl.process());
+    }
+
+
+    @Test
+    public void args_no_file_1() {
+        String[] args = {};
+        testArgsFileGood(args, new String[0]);
+    }
+
+    @Test
+    public void args_no_file_2() {
+        String[] args = {"-q", "-v", "positional"};
+        testArgsFileGood(args, "-q", "-v", "positional");
+    }
+
+    @Test
+    public void args_file_01() {
+        String[] args = {"@"+DIR+"args-good-1"};
+        testArgsFileGood(args, "--arg", "--arg1", "value1", "--arg2=value2", "--empty=", "--trailingspaces", "-q", "positional 1", "positional 2");
+    }
+
+    @Test
+    public void args_file_02() {
+        String[] args = {"@"+DIR+"args-good-2"};
+        testArgsFileGood(args, "-arg", "--", "positional");
+    }
+
+    @Test
+    public void args_file_03() {
+        String[] args = {"@"+DIR+"args-good-3"};
+        testArgsFileGood(args, "text");
+    }
+
+
+    @Test
+    public void args_file_bad_01() {
+        String[] args = {"@"+DIR+"args-good-1", "--another"};
+        testArgsFileBad(args);
+    }
+
+    @Test
+    public void args_file_bad_02() {
+        String[] args = {"@"+DIR+"args-good-1", "@"+DIR+"args-good-2"};
+        testArgsFileBad(args);
+    }
+
+    @Test
+    public void args_file_bad_03() {
+        String[] args = {"@"};
+        testArgsFileBad(args);
+    }
+
+    @Test
+    public void args_file_bad_04() {
+        String[] args = {"@ filename"};
+        testArgsFileBad(args);
+    }
+
+    @Test
+    public void args_file_bad_file_01() {
+        String[] args = {"@"+DIR+"args-bad-1"};
+        testArgsFileBad(args);
+    }
+
+    private void testArgsFileGood(String[] args, String...expected) {
+        String[] args2 = Args.argsPrepare(args);
+        //assertArrayEquals(expected, args2, ()->{ return "Expected: "+Arrays.asList(expected)+" Got: "+Arrays.asList(args2)});
+        assertArrayEquals(expected, args2, ()->("Expected: "+Arrays.asList(expected)+" Got: "+Arrays.asList(args2)));
+    }
+
+    private void testArgsFileBad(String[] args) {
+        assertThrows(CmdException.class, ()->Args.argsPrepare(args));
+    }
+
 }

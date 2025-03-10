@@ -38,7 +38,7 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.jena.atlas.io.IO;
 import org.apache.jena.atlas.lib.Bytes;
@@ -52,6 +52,7 @@ import org.apache.jena.irix.IRIxResolver;
 import org.apache.jena.query.QueryBuildException;
 import org.apache.jena.query.QueryParseException;
 import org.apache.jena.query.Syntax;
+import org.apache.jena.riot.WebContent;
 import org.apache.jena.riot.web.HttpNames;
 import org.apache.jena.shared.OperationDeniedException;
 import org.apache.jena.sparql.engine.http.QueryExceptionHTTP;
@@ -83,7 +84,7 @@ public class SPARQL_Update extends ActionService
 
     @Override
     public void execGet(HttpAction action) {
-        ServletOps.errorMethodNotAllowed(HttpNames.METHOD_GET, "GET not support for SPARQL Update. Use POST or PATCH");
+        ServletOps.errorMethodNotAllowed(HttpNames.METHOD_GET, "SPARQL Update is not supported with GET. Use POST or PATCH instead");
     }
 
     @Override
@@ -98,9 +99,7 @@ public class SPARQL_Update extends ActionService
 
     @Override
     public void execute(HttpAction action) {
-        ContentType ct = ActionLib.getContentType(action);
-        if ( ct == null )
-            ct = ctSPARQLUpdate;
+        ContentType ct = updateContentType(action);
 
         if ( matchContentType(ctSPARQLUpdate, ct) ) {
             executeBody(action);
@@ -124,12 +123,10 @@ public class SPARQL_Update extends ActionService
         if ( HttpNames.METHOD_OPTIONS.equals(action.getRequestMethod()) )
             return;
 
-        if ( ! HttpNames.METHOD_POST.equalsIgnoreCase(action.getRequestMethod()) )
-            ServletOps.errorMethodNotAllowed("SPARQL Update : use POST");
+        if ( ! HttpNames.METHOD_POST.equalsIgnoreCase(action.getRequestMethod()) && ! HttpNames.METHOD_PATCH.equalsIgnoreCase(action.getRequestMethod()) )
+            ServletOps.errorMethodNotAllowed("SPARQL Update : use POST or PATCH");
 
-        ContentType ct = ActionLib.getContentType(action);
-        if ( ct == null )
-            ct = ctSPARQLUpdate;
+        ContentType ct = updateContentType(action);
 
         if ( matchContentType(ctSPARQLUpdate, ct) ) {
             String charset = action.getRequestCharacterEncoding();
@@ -258,7 +255,25 @@ public class SPARQL_Update extends ActionService
                 abortSilent(action);
                 ServletOps.errorOccurred(ex.getMessage(), ex);
             }
-        } finally { action.end(); }
+        } finally { action.endWrite(); }
+    }
+
+    /**
+     * Content type, with a default depending on whether it looks like a HTMLform
+     * using the query string.
+     */
+    private static ContentType updateContentType(HttpAction action) {
+        ContentType ct = ActionLib.getContentType(action);
+        if ( ct != null )
+            return ct;
+
+        // No content type header. Not covered by the spec which has MUST be
+        // HTML form application/x-www-form-urlencoded (query string) or application sparql-update.
+        // However, it is convenient to deal with the "no content header + queryString update=" case.
+        // If there is a query string, "request=" or "update=" treat as HTML form.
+        if ( action.getRequestParameter(paramUpdate) != null ||  action.getRequestParameter(paramRequest) != null )
+            return WebContent.ctHTMLForm;
+        return ctSPARQLUpdate;
     }
 
     /* [It is an error to supply the using-graph-uri or using-named-graph-uri parameters

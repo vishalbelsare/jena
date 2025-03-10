@@ -25,6 +25,7 @@ import org.junit.runners.Suite;
 @Suite.SuiteClasses( {
     TestExecEnvironment.class
     , TestQueryExecDataset.class
+    , TestQueryExecution.class
 } )
 
 public class TS_ExecSPARQL {

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,9 +18,8 @@
 
 package org.apache.jena.cmd;
 
-public interface ArgModule
-{
+/** A group of related arguments */
+public interface ArgModule {
     // Argument processing phase
     public void processArgs(CmdArgModule cmdLine);
 }
-

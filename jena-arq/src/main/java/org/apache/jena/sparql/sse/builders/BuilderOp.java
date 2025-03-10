@@ -25,6 +25,7 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.OpLib;
 import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.op.*;
 import org.apache.jena.sparql.core.*;
@@ -96,6 +97,7 @@ public class BuilderOp
         addBuild(Tags.tagExtend,        buildExtend);
         addBuild(Tags.symAssign,        buildAssign);
         addBuild(Tags.tagSlice,         buildSlice);
+        addBuild(Tags.tagUnfold,        buildUnfold);
 
         addBuild(Tags.tagTable,         buildTable);
         addBuild(Tags.tagNull,          buildNull);
@@ -371,7 +373,7 @@ public class BuilderOp
 		BuilderLib.checkLength(2, 3, list, "condition");
 		Op left = build(list, 1);
 		// No second argument means unit.
-		Op right = OpTable.unit();
+		Op right = OpLib.unit();
 		if ( list.size() != 2 )
 			right  = build(list, 2);
 		Op op = new OpConditional(left, right);
@@ -573,7 +575,7 @@ public class BuilderOp
 		VarExprList x = BuilderExpr.buildNamedExprOrExprList(list.get(1));
 		Op sub;
 		if ( list.size() == 2 )
-			sub = OpTable.unit();
+			sub = OpLib.unit();
 		else
 			sub = build(list, 2);
 		return OpAssign.create(sub, x);
@@ -584,7 +586,7 @@ public class BuilderOp
 		VarExprList x = BuilderExpr.buildNamedExprOrExprList(list.get(1));
 		Op sub;
 		if ( list.size() == 2 )
-			sub = OpTable.unit();
+			sub = OpLib.unit();
 		else
 			sub = build(list, 2);
 		return OpExtend.create(sub, x);
@@ -604,6 +606,20 @@ public class BuilderOp
         return new OpSlice(sub, start, length);
     };
 
+    final protected Build buildUnfold = list -> {
+        BuilderLib.checkLength(3, list, "unfold");
+        Item item1 = list.get(1);   // List of three
+        ItemList argList = item1.getList();
+
+        Expr cdtItem = BuilderExpr.buildExpr(argList.get(0));
+        Var eltVar = BuilderNode.buildVar(argList.get(1));
+        Var idxVar = null;
+        if ( argList.size() == 3 )
+            idxVar = BuilderNode.buildVar(argList.get(2));
+
+        Op subOp = build(list, 2);
+        return new OpUnfold(subOp,cdtItem, eltVar, idxVar);
+    };
 
     final protected Build buildNull = (ItemList list) -> {
 		BuilderLib.checkLength(1, list, Tags.tagNull);

@@ -19,6 +19,7 @@
 package org.apache.jena.fuseki.main;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.jena.atlas.lib.PropertyUtils.loadFromFile;
 import static org.apache.jena.fuseki.Fuseki.serverLog;
 
 import java.io.IOException;
@@ -27,18 +28,19 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import javax.servlet.Filter;
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.Filter;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.jena.atlas.json.JSON;
 import org.apache.jena.atlas.json.JsonObject;
 import org.apache.jena.atlas.lib.FileOps;
 import org.apache.jena.atlas.lib.IRILib;
 import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.atlas.lib.Registry;
+import org.apache.jena.atlas.logging.FmtLog;
+import org.apache.jena.atlas.logging.Log;
 import org.apache.jena.atlas.web.AuthScheme;
 import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.FusekiConfigException;
@@ -50,27 +52,33 @@ import org.apache.jena.fuseki.build.FusekiConfig;
 import org.apache.jena.fuseki.ctl.*;
 import org.apache.jena.fuseki.main.cmds.FusekiMain;
 import org.apache.jena.fuseki.main.sys.*;
-import org.apache.jena.fuseki.metrics.MetricsProviderRegistry;
+import org.apache.jena.fuseki.metrics.MetricsProvider;
+import org.apache.jena.fuseki.mod.prometheus.PrometheusMetricsProvider;
 import org.apache.jena.fuseki.server.*;
 import org.apache.jena.fuseki.servlets.*;
 import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.Node;
 import org.apache.jena.query.Dataset;
-import org.apache.jena.rdf.model.*;
-import org.apache.jena.shared.JenaException;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sparql.core.assembler.AssemblerUtils;
 import org.apache.jena.sparql.util.Context;
-import org.apache.jena.sparql.util.NotUniqueException;
-import org.apache.jena.sparql.util.graph.GraphUtils;
+import org.apache.jena.sparql.util.ContextAccumulator;
 import org.apache.jena.sys.JenaSystem;
-import org.eclipse.jetty.security.ConstraintSecurityHandler;
+import org.apache.jena.system.G;
+import org.apache.jena.system.RDFDataException;
+import org.apache.jena.web.HttpSC;
+import org.eclipse.jetty.ee10.servlet.DefaultServlet;
+import org.eclipse.jetty.ee10.servlet.FilterHolder;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
+import org.eclipse.jetty.ee10.servlet.security.ConstraintSecurityHandler;
 import org.eclipse.jetty.security.SecurityHandler;
 import org.eclipse.jetty.security.UserStore;
 import org.eclipse.jetty.server.*;
-import org.eclipse.jetty.servlet.DefaultServlet;
-import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.slf4j.Logger;
 
 /**
@@ -139,28 +147,70 @@ public class FusekiServer {
      * still be created for the server to be able to provide the action. An endpoint
      * dispatches to an operation, and an operation maps to an implementation. This is a
      * specialised operation - normal use is the operation {@link #create()}.
+     * @deprecated Use {@link #create(OperationRegistry, Context)}.
      */
+    @Deprecated(forRemoval = true)
     public static Builder create(OperationRegistry serviceDispatchRegistry) {
-        return new Builder(serviceDispatchRegistry);
+        return create(serviceDispatchRegistry, Fuseki.getContext());
     }
+
+    /**
+     * Return a builder, with a custom set of operation-action mappings. An endpoint must
+     * still be created for the server to be able to provide the action. An endpoint
+     * dispatches to an operation, and an operation maps to an implementation. This is a
+     * specialised operation - normal use is the operation {@link #create()}.
+     */
+    public static Builder create(OperationRegistry serviceDispatchRegistry, Context context) {
+        if ( context == null )
+            context = Fuseki.getContext();
+        return new Builder(serviceDispatchRegistry, context);
+    }
+
+    /**
+     * Return the {@code FusekiServer} associated with a {@link ServletContext}.
+     * <p>
+     * This will return null if the {@link ServletContext} is not from a FusekiServer.
+     */
+    public static FusekiServer get(ServletContext cxt) {
+        FusekiServer server = (FusekiServer)cxt.getAttribute(Fuseki.attrFusekiServer);
+        if ( server == null )
+            Log.warn(Fuseki.serverLog, "No FusekiServer registered in ServletContext");
+        return server;
+    }
+
+    /**
+     * Default port when running in Java via {@code FusekiServer....build()}.
+     * The server will be http://localhost:3330.
+     *
+     * This is not the command line port (3030) which the command line programme sets.
+     *
+     * See {@link FusekiMain#defaultPort} and {@link FusekiMain#defaultHttpsPort}.
+     */
+    public static final int DefaultServerPort  = 3330;
 
     private final Server server;
     private int httpPort;
     private int httpsPort;
     private final String staticContentDir;
     private final ServletContext servletContext;
+    private final String configFilename;
     private final FusekiModules modules;
 
     private FusekiServer(int httpPort, int httpsPort, Server server,
                          String staticContentDir,
                          FusekiModules modules,
+                         String configFilename,
                          ServletContext fusekiServletContext) {
         this.server = Objects.requireNonNull(server);
         this.httpPort = httpPort;
         this.httpsPort = httpsPort;
         this.staticContentDir = staticContentDir;
         this.servletContext = Objects.requireNonNull(fusekiServletContext);
+        this.configFilename = configFilename;
         this.modules = Objects.requireNonNull(modules);
+
+        // So servlets can find the server.
+        servletContext.setAttribute(Fuseki.attrFusekiServer, this);
     }
 
     /**
@@ -289,6 +339,14 @@ public class FusekiServer {
     }
 
     /**
+     * Return the filename of the configuration file.
+     * Returns null if configuration was by APIs and there is no such file was used.
+     */
+    public String getConfigFilename() {
+        return configFilename;
+    }
+
+    /**
      * Start the server - the server continues to run after this call returns.
      * To synchronise with the server stopping, call {@link #join}.
      */
@@ -317,8 +375,7 @@ public class FusekiServer {
 
         // Extract the ports from the Connectors.
         Arrays.stream(connectors).forEach(c->{
-            if ( c instanceof ServerConnector ) {
-                ServerConnector connector = (ServerConnector)c;
+            if ( c instanceof ServerConnector connector ) {
                 String protocol = connector.getDefaultConnectionFactory().getProtocol();
                 String scheme = (protocol.startsWith("SSL-") || protocol.equals("SSL")) ? "https" : "http";
                 int port = connector.getLocalPort();
@@ -373,7 +430,6 @@ public class FusekiServer {
 
     /** FusekiServer.Builder */
     public static class Builder {
-        private static final int DefaultServerPort  = 3330;
         private static final int PortUnset          = -2;
         private static final int PortInactive       = -3;
 
@@ -389,6 +445,7 @@ public class FusekiServer {
         private boolean                  networkLoopback    = false;
         private int                      minThreads         = -1;
         private int                      maxThreads         = -1;
+        private ErrorHandler             errorHandler       = new FusekiErrorHandler();
 
         private boolean                  verbose            = false;
         private boolean                  withCompact        = false;
@@ -398,6 +455,9 @@ public class FusekiServer {
         private boolean                  withTasks          = false;
 
         private String                   jettyServerConfig  = null;
+
+        // Record calls to parseConfigFile.
+        private String                   configFileName     = null;
         private Model                    configModel        = null;
         private Map<String, String>      corsInitParams     = null;
 
@@ -434,7 +494,7 @@ public class FusekiServer {
         private SecurityHandler          securityHandler    = null;
         private Map<String, Object>      servletAttr        = new HashMap<>();
 
-        //private Context                  context            = null;
+        private final ContextAccumulator context;
 
         // The default CORS settings.
         private static final Map<String, String> corsInitParamsDft = new LinkedHashMap<>();
@@ -455,13 +515,13 @@ public class FusekiServer {
         // Builder with standard operation-action mapping.
         private Builder() {
             this.operationRegistry = OperationRegistry.createStd();
+            this.context = ContextAccumulator.newBuilder(()->Fuseki.getContext().copy());
         }
 
         // Builder with provided operation-action mapping.
-        private Builder(OperationRegistry operationRegistry) {
-            // Isolate.
-            this.operationRegistry = OperationRegistry.createEmpty();
-            OperationRegistry.copyConfig(operationRegistry, this.operationRegistry);
+        private Builder(OperationRegistry operationRegistry, Context context) {
+            this.operationRegistry = new OperationRegistry(operationRegistry);
+            this.context = ContextAccumulator.newBuilder(()->context.copy());
         }
 
         /**
@@ -489,11 +549,12 @@ public class FusekiServer {
             return this;
         }
 
-        /** Context path to Fuseki.  If it's "/" then Fuseki URL look like
+        /**
+         * Context path to Fuseki.  If it's "/" then Fuseki URL look like
          * "http://host:port/dataset/query" else "http://host:port/path/dataset/query"
+         * The default is "/".
          */
         public Builder contextPath(String path) {
-            requireNonNull(path, "path");
             this.contextPath = path;
             return this;
         }
@@ -507,7 +568,16 @@ public class FusekiServer {
         /** Set the location (filing system directory) to serve static files from. */
         public Builder staticFileBase(String directory) {
             requireNonNull(directory, "directory");
-            this.staticContentDir = directory;
+            if ( directory.startsWith("jar:") ) {
+                // jetty resource
+                this.staticContentDir = directory;
+                return this;
+            }
+            if ( ! FileOps.exists(directory) )
+                Fuseki.configLog.warn("File area not found: "+directory);
+            // Resolve path.
+            String dir = Path.of(directory).toAbsolutePath().toString();
+            this.staticContentDir = dir;
             return this;
         }
 
@@ -537,11 +607,28 @@ public class FusekiServer {
             return this;
         }
 
-        /** Add the Cross Origin (CORS) filter.
-         * {@link CrossOriginFilter}.
+        /**
+         * Enable or disable a Cross Origin (CORS) filter with default settings.
+         * @see CrossOriginFilter
          */
         public Builder enableCors(boolean withCORS) {
-            corsInitParams = withCORS ? corsInitParamsDft : null ;
+            return enableCors(withCORS, null);
+
+        }
+        /**
+         * Enable a Cross Origin (CORS) filter with a specific configuration,
+         * or disable CORS processing.
+         *
+         * @see CrossOriginFilter
+         */
+        public Builder enableCors(boolean withCORS, String corsConfigFile) {
+            if ( withCORS ) {
+                corsInitParams = (corsConfigFile == null)
+                        ? corsInitParamsDft
+                        : parseCORSConfigFile(corsConfigFile);
+            } else {
+                corsInitParams = null;
+            }
             return this;
         }
 
@@ -741,12 +828,34 @@ public class FusekiServer {
         /**
          * Configure using a Fuseki services/datasets assembler file.
          * <p>
-         * The application is responsible for ensuring a correct classpath. For example,
-         * including a dependency on {@code jena-text} if the configuration file includes
-         * a text index.
+         * The configuration file is processed in this call so that subsequent
+         * builder operations can refer to data services created by this call.
+         * <p>
+         * The calling application is responsible for ensuring a correct classpath.
+         * For example, including a dependency on {@code jena-text} if the
+         * configuration file includes a text index.
+         */
+        public Builder parseConfigFile(Path filename) {
+            requireNonNull(filename, "filename");
+            parseConfigFile(filename.toString());
+            return this;
+        }
+
+        /**
+         * Configure using a Fuseki services/datasets assembler file.
+         * <p>
+         * The configuration file is processed in this call so that subsequent
+         * builder operations can refer to data services created by this call.
+         * <p>
+         * The calling application is responsible for ensuring a correct classpath.
+         * For example, including a dependency on {@code jena-text} if the
+         * configuration file includes a text index.
          */
         public Builder parseConfigFile(String filename) {
             requireNonNull(filename, "filename");
+            if ( configFileName != null )
+                FmtLog.warn(Fuseki.configLog, "Multiple configuration files (reload will not be possible)");
+            this.configFileName = filename;
             Model model = AssemblerUtils.readAssemblerFile(filename);
             parseConfig(model);
             return this;
@@ -761,22 +870,15 @@ public class FusekiServer {
          */
         public Builder parseConfig(Model model) {
             requireNonNull(model, "model");
-            Resource server = FusekiConfig.findServer(model);
-            processConfigServerLevel(server);
-
-            // Process server and services, whether via server ja:services or, if absent, by finding by type.
-
-            // Context is only set, not deleted, in a configuration file.
-            Context settings = new Context();
-            List<DataAccessPoint> x = FusekiConfig.processServerConfiguration(model, settings);
-
-            // Side effect - sets global context.
-            Fuseki.getContext().putAll(settings);
-            // Can further modify the services in the configuration file.
-            x.forEach(dap->addDataAccessPoint(dap));
+            parseConfiguration(model.getGraph());
             configModel = model;
             return this;
         }
+
+        /**
+         * Return the config model
+         */
+        public Model configModel() { return configModel; }
 
         /**
          * Configure using a Fuseki services/datasets assembler in a {@link Graph}.
@@ -786,7 +888,28 @@ public class FusekiServer {
          * a text index.
          */
         public Builder parseConfig(Graph graph) {
-            return parseConfig(ModelFactory.createModelForGraph(graph));
+            requireNonNull(graph, "graph");
+            parseConfiguration(graph);
+            configModel = ModelFactory.createModelForGraph(graph);
+            return this;
+        }
+
+        public void parseConfiguration(Graph graph) {
+            requireNonNull(graph, "graph");
+
+            Node server = FusekiConfig.findServer(graph);
+            processConfigServerLevel(graph, server);
+
+            // Process server and services, whether via server ja:services or, if absent, by finding by type.
+
+            // Context is only set, not deleted, in a configuration file.
+            Context settings = new Context();
+            List<DataAccessPoint> x = FusekiConfig.processServerConfiguration(graph, settings);
+
+            // Side effect - sets global context.
+            Fuseki.getContext().putAll(settings);
+            // Can further modify the services in the configuration file.
+            x.forEach(dap->addDataAccessPoint(dap));
         }
 
         /** Add a {@link DataAccessPoint} as a builder. */
@@ -805,7 +928,7 @@ public class FusekiServer {
         public Builder jettyServerConfig(String filename) {
             requireNonNull(filename, "filename");
             if ( ! FileOps.exists(filename) )
-                throw new FusekiConfigException("File no found: "+filename);
+                throw new FusekiConfigException("File not found: "+filename);
             this.jettyServerConfig = filename;
             return this;
         }
@@ -817,27 +940,37 @@ public class FusekiServer {
         private void processConfigServerLevel(Resource server) {
             if ( server == null )
                 return;
+            processConfigServerLevel(server.getModel().getGraph(), server.asNode());
+        }
 
-            enablePing(argBoolean(server, FusekiVocab.pServerPing,  false));
-            enableStats(argBoolean(server, FusekiVocab.pServerStats, false));
-            enableMetrics(argBoolean(server, FusekiVocab.pServerMetrics, false));
-            enableCompact(argBoolean(server, FusekiVocab.pServerCompact, false));
+        private void processConfigServerLevel(Graph config, Node server) {
+            if ( server == null )
+                return;
 
-            processConfAuthentication(server);
-
-            serverAuth = FusekiConfig.allowedUsers(server);
+            if ( G.hasProperty(config, server, FusekiVocabG.pServerContextPath) )
+                contextPath(argString(config, server, FusekiVocabG.pServerContextPath, "/"));
+            enablePing(argBoolean(config, server, FusekiVocabG.pServerPing,  false));
+            enableStats(argBoolean(config, server, FusekiVocabG.pServerStats, false));
+            enableMetrics(argBoolean(config, server, FusekiVocabG.pServerMetrics, false));
+            enableCompact(argBoolean(config, server, FusekiVocabG.pServerCompact, false));
+            processConfAuthentication(config, server);
+            serverAuth = FusekiConfig.allowedUsers(config, server);
         }
 
         /** Process password file, auth and realm settings on the server description. **/
         private void processConfAuthentication(Resource server) {
-            String passwdFile = GraphUtils.getAsStringValue(server, FusekiVocab.pPasswordFile);
+
+        }
+
+        private void processConfAuthentication(Graph config, Node server) {
+            String passwdFile = getAsString(config, server, FusekiVocabG.pPasswordFile);
             if ( passwdFile != null )
                 passwordFile(passwdFile);
-            String realmStr = GraphUtils.getAsStringValue(server, FusekiVocab.pRealm);
+            String realmStr = getAsString(config, server, FusekiVocabG.pRealm);
             if ( realmStr != null )
                 realm(realmStr);
 
-            String authStr = GraphUtils.getAsStringValue(server, FusekiVocab.pAuth);
+            String authStr = getAsString(config, server, FusekiVocabG.pAuth);
             if ( authStr != null ) {
                 AuthScheme authScheme = AuthScheme.scheme(authStr);
                 switch (authScheme) {
@@ -852,19 +985,48 @@ public class FusekiServer {
             }
         }
 
-        private static boolean argBoolean(Resource r, Property p, boolean dftValue) {
-            try { GraphUtils.atmostOneProperty(r, p); }
-            catch (NotUniqueException ex) {
-                throw new FusekiConfigException(ex.getMessage());
-            }
-            Statement stmt = r.getProperty(p);
-            if ( stmt == null )
-                return dftValue;
+        private static boolean argBoolean(Graph graph, Node r, Node p, boolean dftValue) {
             try {
-                return stmt.getBoolean();
-            } catch (JenaException ex) {
-                throw new FusekiConfigException("Not a boolean for '"+p+"' : "+stmt.getObject());
+                Boolean bool = getAsBoolean(graph, r, p);
+                if ( bool == null )
+                    return dftValue;
+                return bool;
+            } catch (RDFDataException ex) {
+                throw new FusekiConfigException("Boolean argument "+r+" "+p+" "+ex.getMessage());
             }
+        }
+
+        private static String argString(Graph graph, Node r, Node p, String dftValue) {
+            try {
+                String str = getAsString(graph, r, p);
+                if ( str == null )
+                    return dftValue;
+                return str;
+            } catch (RDFDataException ex) {
+                throw new FusekiConfigException("String argument "+r+" "+p+" "+ex.getMessage());
+            }
+        }
+
+        /** URI or xsd:string as java string. **/
+        private static String getAsString(Graph config, Node server, Node property) {
+            Node n = G.getZeroOrOneSP(config, server, property);
+            if ( n == null )
+                return null;
+            if ( n.isURI() )
+                return n.getURI();
+            if ( G.isString(n) )
+                return G.asString(n);
+            throw new FusekiConfigException("Not a URI or a string");
+        }
+
+        private static Boolean getAsBoolean(Graph config, Node server, Node property) {
+            Node n = G.getZeroOrOneSP(config, server, property);
+            if ( n == null )
+                return null;
+            if ( G.isBoolean(n) ) {
+                return G.asBoolean(n);
+            }
+            throw new FusekiConfigException("Not a boolean");
         }
 
         /**
@@ -1001,8 +1163,8 @@ public class FusekiServer {
             requireNonNull(processor, "processor");
 
             HttpServlet servlet;
-            if ( processor instanceof HttpServlet )
-                servlet = (HttpServlet)processor;
+            if ( processor instanceof HttpServlet proc )
+                servlet = proc;
             else
                 servlet = new ServletAction(processor, log);
             addServlet(pathSpec, servlet);
@@ -1059,7 +1221,7 @@ public class FusekiServer {
          *
          * @see FusekiModules
          */
-        public Builder setModules(FusekiModules modules) {
+        public Builder fusekiModules(FusekiModules modules) {
             fusekiModules = modules;
             return this;
         }
@@ -1067,7 +1229,7 @@ public class FusekiServer {
         /**
          * Return the current list of Fuseki modules in the builder.
          */
-        public FusekiModules getFusekiModules() {
+        public FusekiModules fusekiModules() {
             return fusekiModules;
         }
 
@@ -1166,7 +1328,9 @@ public class FusekiServer {
         }
 
         /**
-         * Set the number threads used by Jetty. This uses a {@code org.eclipse.jetty.util.thread.QueuedThreadPool} provided by Jetty.
+         * Set the number threads used by Jetty.
+         * This uses a {@link org.eclipse.jetty.util.thread.QueuedThreadPool}
+         * provided by Jetty.
          * <p>
          * Argument order is (minThreads, maxThreads).
          * <ul>
@@ -1227,7 +1391,7 @@ public class FusekiServer {
                 serverHttpPort = DefaultServerPort;
 
             FusekiModules modules = (fusekiModules == null)
-                    ? FusekiModulesSystem.get()
+                    ? FusekiModules.getSystemModules()
                     : fusekiModules;
 
             // FusekiModule call - final preparations.
@@ -1243,17 +1407,19 @@ public class FusekiServer {
             // FusekiModule call - inspect the DataAccessPointRegistry.
             FusekiModuleStep.configured(modules, this, dapRegistry, configModel);
 
-            // Setup Prometheus metrics. This will become a module.
-            bindPrometheus(dapRegistry);
-
-            // Process the DataAccessPointRegistry for security.
-            buildSecurity(dapRegistry);
-
             try {
                 validate();
 
+                // Process the DataAccessPointRegistry for security.
+                buildSecurity(dapRegistry);
+
                 // Build the ServletContextHandler - the Jetty server configuration.
                 ServletContextHandler handler = buildFusekiServerContext();
+                handler.getServletContext();
+
+                // Setup Prometheus metrics.
+                bindPrometheus(handler.getServletContext(), dapRegistry);
+
                 boolean hasFusekiSecurityHandler = applySecurityHandler(handler);
                 // Prepare the DataAccessPointRegistry.
                 // Put it in the servlet context.
@@ -1265,8 +1431,13 @@ public class FusekiServer {
                     applyAccessControl(handler, dapRegistry);
 
                 if ( jettyServerConfig != null ) {
+                    // Jetty server configuration provided.
                     Server server = jettyServer(handler, jettyServerConfig);
-                    return new FusekiServer(-1, -1, server, staticContentDir, modules, handler.getServletContext());
+                    return new FusekiServer(-1, -1, server,
+                                            staticContentDir,
+                                            modules,
+                                            configFileName,
+                                            handler.getServletContext());
                 }
 
                 Server server;
@@ -1278,12 +1449,24 @@ public class FusekiServer {
                     server = jettyServer(handler, httpPort, minThreads, maxThreads);
                 } else {
                     // HTTPS, no http redirection.
-                    server = jettyServerHttps(handler, httpPort, httpsPort, minThreads, maxThreads, httpsKeystore, httpsKeystorePasswd);
+                    server = jettyServerHttps(handler, httpPort, httpsPort, minThreads, maxThreads,
+                                              httpsKeystore, httpsKeystorePasswd);
                 }
+                // The servletContext error handler isn't called when there is a
+                // dispatch to something that isn't there.
+                // Jetty default error handler is broken for application/json for Jetty GH-10474
+                // Jetty 12.0.1 - fixed at 12.0.next
+                if ( errorHandler != null )
+                    server.setErrorHandler(errorHandler);
+
                 if ( networkLoopback )
                     applyLocalhost(server);
 
-                FusekiServer fusekiServer = new FusekiServer(httpPort, httpsPort, server, staticContentDir, modules, handler.getServletContext());
+                FusekiServer fusekiServer = new FusekiServer(httpPort, httpsPort, server,
+                                                             staticContentDir,
+                                                             modules,
+                                                             configFileName,
+                                                             handler.getServletContext());
                 FusekiModuleStep.server(fusekiServer);
                 return fusekiServer;
             } finally {
@@ -1305,10 +1488,14 @@ public class FusekiServer {
             return dapRegistry;
         }
 
-        private void bindPrometheus(DataAccessPointRegistry dapRegistry) {
+        private void bindPrometheus(ServletContext servletContext, DataAccessPointRegistry dapRegistry) {
             if ( withMetrics ) {
-                // Connect to Prometheus metrics.
-                MetricsProviderRegistry.bindPrometheus(dapRegistry);
+                MetricsProvider metricProvider = MetricsProvider.getMetricsProvider(servletContext);
+                if ( metricProvider == null ) {
+                    metricProvider = new PrometheusMetricsProvider();
+                    MetricsProvider.setMetricsProvider(servletContext, metricProvider);
+                }
+                metricProvider.dataAccessPointMetrics(metricProvider, dapRegistry);
             }
         }
 
@@ -1326,7 +1513,7 @@ public class FusekiServer {
             return handler;
         }
 
-        private static void prepareDataServices(DataAccessPointRegistry dapRegistry, OperationRegistry operationReg) {
+        /*package*/ static void prepareDataServices(DataAccessPointRegistry dapRegistry, OperationRegistry operationReg) {
             dapRegistry.forEach((name, dap) -> {
                 // Override for graph-level access control.
                 if ( DataAccessCtl.isAccessControlled(dap.getDataService().getDataset()) ) {
@@ -1525,7 +1712,8 @@ public class FusekiServer {
                 contextPath = "/" + contextPath;
             ServletContextHandler context = new ServletContextHandler();
             context.setDisplayName(Fuseki.servletRequestLogName);
-            context.setErrorHandler(new FusekiErrorHandler());
+            // Also set on the server which handles requests that don't Fuseki-dispatch.
+            context.setErrorHandler(errorHandler);
             context.setContextPath(contextPath);
             // SPARQL Update by HTML - not the best way but.
             context.setMaxFormContentSize(1024*1024);
@@ -1579,7 +1767,7 @@ public class FusekiServer {
             if ( staticContentDir != null ) {
                 DefaultServlet staticServlet = new DefaultServlet();
                 ServletHolder staticContent = new ServletHolder(staticServlet);
-                staticContent.setInitParameter("resourceBase", staticContentDir);
+                staticContent.setInitParameter("baseResource", staticContentDir);
                 //staticContent.setInitParameter("cacheControl", "false");
                 context.addServlet(staticContent, "/");
             } else {
@@ -1593,6 +1781,8 @@ public class FusekiServer {
 
         /** 404 for HEAD/GET/POST/PUT */
         static class Servlet404 extends HttpServlet {
+
+            public Servlet404() {}
             // service()?
             @Override
             protected void doHead(HttpServletRequest req, HttpServletResponse resp)     { err404(req, resp); }
@@ -1607,7 +1797,7 @@ public class FusekiServer {
             //protected void doOptions(HttpServletRequest req, HttpServletResponse resp)
             private static void err404(HttpServletRequest req, HttpServletResponse response) {
                 try {
-                    response.sendError(404, "NOT FOUND");
+                    response.sendError(HttpSC.NOT_FOUND_404, HttpSC.getMessage(HttpSC.NOT_FOUND_404));
                 } catch (IOException ex) {}
             }
         }
@@ -1650,7 +1840,7 @@ public class FusekiServer {
             return server;
         }
 
-        /** Jetty server with https. */
+        /** Jetty server with https */
         private static Server jettyServerHttps(ServletContextHandler handler, int httpPort, int httpsPort, int minThreads, int maxThreads, String keystore, String certPassword) {
             return JettyHttps.jettyServerHttps(handler, keystore, certPassword, httpPort, httpsPort, minThreads, maxThreads);
         }
@@ -1659,9 +1849,22 @@ public class FusekiServer {
         private static void applyLocalhost(Server server) {
             Connector[] connectors = server.getConnectors();
             for ( int i = 0; i < connectors.length; i++ ) {
-                if ( connectors[i] instanceof ServerConnector ) {
-                    ((ServerConnector)connectors[i]).setHost("localhost");
+                if ( connectors[i] instanceof ServerConnector serverConnector) {
+                    serverConnector.setHost("localhost");
                 }
+            }
+        }
+
+        private static Map<String, String> parseCORSConfigFile(String filename) {
+            try {
+                Properties properties = loadFromFile(filename);
+                Map<String, String> map = new HashMap<>(properties.size());
+                for (Map.Entry<Object, Object> entry : properties.entrySet()) {
+                    map.put((String) entry.getKey(), (String) entry.getValue());
+                }
+                return map;
+            } catch (Exception ex) {
+                throw new FusekiConfigException("Failed to read the CORS config file: "+ filename, ex);
             }
         }
     }

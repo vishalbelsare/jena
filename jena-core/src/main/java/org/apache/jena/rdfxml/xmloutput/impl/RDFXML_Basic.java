@@ -20,21 +20,22 @@ package org.apache.jena.rdfxml.xmloutput.impl;
 
 import java.io.PrintWriter;
 
+import org.apache.jena.datatypes.xsd.impl.XMLLiteralType;
 import org.apache.jena.rdf.model.* ;
 import org.apache.jena.rdf.model.impl.Util ;
 import org.apache.jena.vocabulary.RDFSyntax ;
 
 /** Writes out an XML serialization of a model.
  */
-public class RDFXML_Basic extends BaseXMLWriter 
+public class RDFXML_Basic extends BaseXMLWriter
     {
-	public RDFXML_Basic() 
+	public RDFXML_Basic()
         {}
-    
+
     private String space;
-	
+
     @Override protected void writeBody
-        ( Model model, PrintWriter pw, String base, boolean inclXMLBase ) 
+        ( Model model, PrintWriter pw, String base, boolean inclXMLBase )
         {
         setSpaceFromTabCount();
 		writeRDFHeader( model, pw );
@@ -48,11 +49,11 @@ public class RDFXML_Basic extends BaseXMLWriter
         space = "";
         for (int i=0; i < tabSize; i += 1) space += " ";
         }
-    
+
     protected void writeSpace( PrintWriter writer )
         { writer.print( space ); }
 
-	private void writeRDFHeader(Model model, PrintWriter writer) 
+	private void writeRDFHeader(Model model, PrintWriter writer)
         {
 		String xmlns = xmlnsDecl();
 		writer.print( "<" + rdfEl( "RDF" ) + xmlns );
@@ -67,7 +68,7 @@ public class RDFXML_Basic extends BaseXMLWriter
 		while (rIter.hasNext()) writeRDFStatements( model, rIter.nextResource(), writer );
 		}
 
-	protected void writeRDFTrailer( PrintWriter writer, String base ) 
+	protected void writeRDFTrailer( PrintWriter writer, String base )
         { writer.println( "</" + rdfEl( "RDF" ) + ">" ); }
 
 	protected void writeRDFStatements
@@ -94,9 +95,9 @@ public class RDFXML_Basic extends BaseXMLWriter
 		writer.print(space+space+
 			"<"
 				+ startElementTag(
-					predicate.getNameSpace(),
-					predicate.getLocalName()));
-                           
+					SplitRDFXML.namespace(predicate),
+					SplitRDFXML.localname(predicate)));
+
 		if (object instanceof Resource) {
 			writer.print(" ");
 			writeResourceReference(((Resource) object), writer);
@@ -105,18 +106,16 @@ public class RDFXML_Basic extends BaseXMLWriter
 			writeLiteral((Literal) object, writer);
 			writer.println(
 				"</"
-					+ endElementTag(
-						predicate.getNameSpace(),
-						predicate.getLocalName())
+					+ endElementTag(SplitRDFXML.namespace(predicate), SplitRDFXML.localname(predicate))
 					+ ">");
 		}
 	}
-    
-    @Override protected void unblockAll() 
+
+    @Override protected void unblockAll()
         { blockLiterals = false; }
-    
+
     private boolean blockLiterals = false;
-    
+
     @Override protected void blockRule( Resource r ) {
         if (r.equals( RDFSyntax.parseTypeLiteralPropertyElt )) {
             blockLiterals = true;
@@ -124,10 +123,10 @@ public class RDFXML_Basic extends BaseXMLWriter
            logger.warn("Cannot block rule <"+r.getURI()+">");
     }
 
-	protected void writeDescriptionTrailer( Resource subject, PrintWriter writer ) 
+	protected void writeDescriptionTrailer( Resource subject, PrintWriter writer )
         { writer.println( space + "</" + rdfEl( "Description" ) + ">" ); }
-    
-    
+
+
     protected void writeResourceId( Resource r, PrintWriter writer )
         {
 		if (r.isAnon()) {
@@ -152,20 +151,21 @@ public class RDFXML_Basic extends BaseXMLWriter
 		}
 	}
 
-	protected void writeLiteral( Literal l, PrintWriter writer ) {
-		String lang = l.getLanguage();
-        String form = l.getLexicalForm();
-		if (Util.isLangString(l)) {
+    protected void writeLiteral( Literal literal, PrintWriter writer ) {
+		String lang = literal.getLanguage();
+        String form = literal.getLexicalForm();
+        boolean isXML = XMLLiteralType.isXMLLiteral(literal.getDatatype());
+		if (Util.isLangString(literal)) {
 			writer.print(" xml:lang=" + attributeQuoted( lang ));
-		} else if (l.isWellFormedXML() && !blockLiterals) {
+		} else if ( isXML && !blockLiterals) {
 		    // RDF XML Literals inline.
 			writer.print(" " + rdfAt("parseType") + "=" + attributeQuoted( "Literal" )+">");
 			writer.print( form );
 			return ;
 		} else {
-	        // Datatype (if not xsd:string and RDF 1.1) 
-	        String dt = l.getDatatypeURI();
-	        if ( ! Util.isSimpleString(l) ) 
+	        // Datatype (if not xsd:string and RDF 1.1)
+	        String dt = literal.getDatatypeURI();
+	        if ( ! Util.isSimpleString(literal) )
 	            writer.print( " " + rdfAt( "datatype" ) + "=" + substitutedAttribute( dt ) );
 		}
 		// Content.

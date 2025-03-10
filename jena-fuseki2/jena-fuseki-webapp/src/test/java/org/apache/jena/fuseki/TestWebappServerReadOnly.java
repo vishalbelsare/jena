@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -44,7 +44,6 @@ public class TestWebappServerReadOnly
     @BeforeClass
     public static void allocServerForSuite() {
         ServerCtl.freeServer();
-        //Manage ourselves.
         ServerCtl.setupServer(false);
     }
 
@@ -61,7 +60,9 @@ public class TestWebappServerReadOnly
 
     @Test()
     public void update_readonly() {
-        HttpTest.expect404( () -> {
+        HttpTest.expect405( () -> {
+            // There is no dispatch and it gets passed to the web container.
+            // Theee is no POSTS handler - there is for for GET (static resources).
             UpdateExecution.service(serviceUpdate()).update("INSERT DATA {}").execute();
         });
     }

@@ -27,10 +27,12 @@ import java.util.Objects;
 
 import javax.xml.datatype.Duration;
 
-import org.apache.jena.JenaRuntime;
 import org.apache.jena.atlas.lib.StrUtils;
+import org.apache.jena.cdt.CompositeDatatypeList;
+import org.apache.jena.cdt.CompositeDatatypeMap;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
+import org.apache.jena.graph.impl.LiteralLabel;
 import org.apache.jena.sparql.ARQInternalErrorException;
 import org.apache.jena.sparql.SystemARQ;
 import org.apache.jena.sparql.expr.nodevalue.NodeFunctions;
@@ -55,12 +57,10 @@ public class NodeValueCmp {
 
         ValueSpace compType = NodeValue.classifyValueOp(nv1, nv2);
 
-        if ( nv1 == nv2 )
-            return true;
-        if ( nv1.hasNode() && nv2.hasNode() ) {
-            // Fast path - same RDF term => sameValue
-            if ( nv1.getNode().equals(nv2.getNode()) )
-                return true;
+        if ( nv1.equals(nv2) ) {
+            // Fast path - same RDF term => sameValue (except NaN).
+            if ( nv1.getNode() != null && nv2.getNode() != null && nv1.getNode().equals(nv2.asNode()) )
+                return sameExceptNaN(nv1, nv2);
         }
 
         // Special case - date/dateTime comparison is affected by timezones and may
@@ -147,9 +147,29 @@ public class NodeValueCmp {
                     raise(new ExprEvalException("Incompatible: " + nv1 + " and " + nv2));
                 // Not same node.
                 return false;
+
+            case VSPACE_CDT_LIST : {
+                final LiteralLabel lit1 = nv1.asNode().getLiteral() ;
+                final LiteralLabel lit2 = nv2.asNode().getLiteral() ;
+                return CompositeDatatypeList.type.isEqual(lit1, lit2) ;
+            }
+            case VSPACE_CDT_MAP : {
+                final LiteralLabel lit1 = nv1.asNode().getLiteral() ;
+                final LiteralLabel lit2 = nv2.asNode().getLiteral() ;
+                return CompositeDatatypeMap.type.isEqual(lit1, lit2) ;
+            }
         }
 
         throw new ARQInternalErrorException("sameValueAs failure " + nv1 + " and " + nv2);
+    }
+
+    // When nv1 and nv1 are known to be the sameTerm, including java ==
+    private static boolean sameExceptNaN(NodeValue nv1, NodeValue nv2) {
+        if ( nv1.isDouble() && Double.isNaN(nv1.getDouble()) )
+            return false;
+        if ( nv1.isFloat() && Float.isNaN(nv1.getFloat()) )
+            return false;
+        return true;
     }
 
     /** Worker for sameAs. */
@@ -171,8 +191,9 @@ public class NodeValueCmp {
      * Return true if the two NodeValues are known to be different, return false if
      * the two NodeValues are known to be the same, else throw ExprEvalException
      */
-    /*package*/private static boolean notSameValueAs(NodeValue nv1, NodeValue nv2) {
-        return !sameValueAs(nv1, nv2);
+    /*package*/ static boolean notSameValueAs(NodeValue nv1, NodeValue nv2) {
+        // Works for NaN as well.
+        return  !sameValueAs(nv1, nv2);
     }
 
     // ==== Compare
@@ -197,13 +218,16 @@ public class NodeValueCmp {
         if ( nv2 == null )
             return CMP_GREATER;
 
-        if ( nv1.hasNode() && nv2.hasNode() ) {
+        ValueSpace compType = classifyValueOp(nv1, nv2) ;
+
+        if ( nv1.hasNode()
+             && nv2.hasNode()
+             && compType != ValueSpace.VSPACE_CDT_LIST
+             && compType != ValueSpace.VSPACE_CDT_MAP ) {
             // Fast path - same RDF term => CMP_EQUAL
             if ( nv1.getNode().equals(nv2.getNode()) )
                 return CMP_EQUAL;
         }
-
-        ValueSpace compType = classifyValueOp(nv1, nv2) ;
 
         // Special case - date/dateTime comparison is affected by timezones and may be
         // indeterminate based on the value of the dateTime/date.
@@ -226,7 +250,7 @@ public class NodeValueCmp {
                 // Must be same URI
                 if ( nv1.getDatatypeURI().equals(nv2.getDatatypeURI()) )
                     // Indeterminate possible.
-                    return XSDFuncOp.compareDateTimeXSD(nv1, nv2);
+                    return XSDFuncOp.compareDateTime(nv1, nv2);
                 raise(new ExprNotComparableException("Can't compare (incompatible temporal value spaces) "+nv1+" and "+nv2)) ;
 
 //            case VSPACE_DURATION_DAYTIME:
@@ -288,20 +312,20 @@ public class NodeValueCmp {
 
             case VSPACE_STRING: {
                 int x = XSDFuncOp.compareString(nv1, nv2) ;
-                if ( JenaRuntime.isRDF11 )
+                //if ( JenaRuntime.isRDF11 )
                     return x;
 
-                // Equality.
-                // RDF 1.0
-                // Split plain literals and xsd:strings for sorting purposes.
-                // Same by string value.
-                String dt1 = nv1.asNode().getLiteralDatatypeURI() ;
-                String dt2 = nv2.asNode().getLiteralDatatypeURI() ;
-                if ( dt1 == null && dt2 != null )
-                    return CMP_LESS;
-                if ( dt2 == null && dt1 != null )
-                    return CMP_GREATER;
-                return CMP_EQUAL;  // Both plain or both xsd:string.
+//                // Equality.
+//                // RDF 1.0 legacy note.
+//                // Split plain literals and xsd:strings for sorting purposes.
+//                // Same by string value.
+//                String dt1 = nv1.asNode().getLiteralDatatypeURI() ;
+//                String dt2 = nv2.asNode().getLiteralDatatypeURI() ;
+//                if ( dt1 == null && dt2 != null )
+//                    return CMP_LESS;
+//                if ( dt2 == null && dt1 != null )
+//                    return CMP_GREATER;
+//                return CMP_EQUAL;  // Both plain or both xsd:string.
             }
 
             case VSPACE_QUOTED_TRIPLE: {
@@ -340,6 +364,28 @@ public class NodeValueCmp {
                 if ( x != CMP_INDETERMINATE )
                     return x;
                 raise(new ExprNotComparableException("Can't compare valiables as values "+nv1+" and "+nv2)) ;
+            }
+
+            case VSPACE_CDT_LIST : {
+                final LiteralLabel lit1 = nv1.asNode().getLiteral() ;
+                final LiteralLabel lit2 = nv2.asNode().getLiteral() ;
+                try {
+                    return CompositeDatatypeList.compare(lit1, lit2, sortOrderingCompare) ;
+                }
+                catch( final ExprNotComparableException e ) {
+                    raise(e) ;
+                }
+            }
+
+            case VSPACE_CDT_MAP : {
+                final LiteralLabel lit1 = nv1.asNode().getLiteral() ;
+                final LiteralLabel lit2 = nv2.asNode().getLiteral() ;
+                try {
+                    return CompositeDatatypeMap.compare(lit1, lit2, sortOrderingCompare) ;
+                }
+                catch( final ExprNotComparableException e ) {
+                    raise(e) ;
+                }
             }
 
             case VSPACE_UNKNOWN : {
@@ -418,6 +464,18 @@ public class NodeValueCmp {
             if ( vs2 != ValueSpace.VSPACE_UNKNOWN )
                 return CMP_GREATER;
             return NodeCmp$compareRDFTerms(nv1, nv2);
+        }
+
+        if ( vs1 == ValueSpace.VSPACE_CDT_LIST && vs2 == ValueSpace.VSPACE_CDT_LIST ) {
+            LiteralLabel l1 = nv1.asNode().getLiteral();
+            LiteralLabel l2 = nv2.asNode().getLiteral();
+            return CompositeDatatypeList.compare(l1, l2, true);
+        }
+
+        if ( vs1 == ValueSpace.VSPACE_CDT_MAP && vs2 == ValueSpace.VSPACE_CDT_MAP ) {
+            LiteralLabel l1 = nv1.asNode().getLiteral();
+            LiteralLabel l2 = nv2.asNode().getLiteral();
+            return CompositeDatatypeMap.compare(l1, l2, true);
         }
 
         // XXX G and Date cases.

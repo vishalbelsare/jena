@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,7 +27,9 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 
-
+/**
+ * ARQ scripted tests.
+ */
 @RunWith(RunnerSPARQL.class)
 @Label("ARQ")
 @Manifests({

@@ -20,12 +20,13 @@ package org.apache.jena.fuseki.main;
 
 import static org.apache.jena.fuseki.test.HttpTest.expect400;
 import static org.apache.jena.fuseki.test.HttpTest.expect404;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 
+import org.junit.jupiter.api.Test;
+
 import org.apache.jena.atlas.io.IO;
-import org.apache.jena.atlas.lib.StrUtils;
 import org.apache.jena.atlas.web.TypedInputStream;
 import org.apache.jena.base.Sys;
 import org.apache.jena.graph.Graph;
@@ -35,20 +36,19 @@ import org.apache.jena.rdfconnection.RDFConnection;
 import org.apache.jena.rdfconnection.RDFConnectionRemote;
 import org.apache.jena.rdfconnection.RDFConnectionRemoteBuilder;
 import org.apache.jena.sparql.core.Var;
-import org.junit.Test;
 
 /** Test server configuration by configuration file */
 public class TestConfigFile {
 
     private static final String DIR = "testing/Config/";
 
-    private static final String PREFIXES = StrUtils.strjoinNL
-        ("PREFIX afn: <http://jena.apache.org/ARQ/function#>"
-        ,"PREFIX fuseki: <http://jena.apache.org/fuseki#>"
-        ,"PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-        ,"PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
-        , ""
-        );
+    private static final String PREFIXES = """
+        PREFIX afn: <http://jena.apache.org/ARQ/function#>
+        PREFIX fuseki: <http://jena.apache.org/fuseki#>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+        """;
 
     private static RDFConnection namedServices(String baseURL) {
         return RDFConnectionRemote.newBuilder()
@@ -354,13 +354,11 @@ public class TestConfigFile {
 
     private static int countDftGraph(RDFConnection conn) {
         try ( QueryExecution qExec = conn.query("SELECT (count(*) AS ?C) { ?s ?p ?o }") ) {
-            Object obj = qExec.execSelect().nextBinding().get(Var.alloc("C")).getIndexingValue();
+            Object obj = qExec.execSelect().nextBinding().get(Var.alloc("C")).getLiteralValue();
             int x = ((Number)obj).intValue();
             return x;
         }
     }
-
-
 
     private static void assertCxtValue(RDFConnection conn, String contextSymbol, String value) {
         String actual =
@@ -373,21 +371,21 @@ public class TestConfigFile {
 
     private static void assertCxtValueNotNull(RDFConnection conn, String contextSymbol) {
         boolean b = conn.queryAsk(PREFIXES+"ASK { FILTER (afn:context('"+contextSymbol+"') != '' ) }");
-        assertTrue(contextSymbol, b);
+        assertTrue(b, contextSymbol);
     }
 
     private static void assertCxtValueNull(RDFConnection conn, String contextSymbol) {
         boolean b = conn.queryAsk(PREFIXES+"ASK { FILTER (afn:context('"+contextSymbol+"') = '' ) }");
-        assertTrue("Not null: "+contextSymbol, b);
+        assertTrue(b, "Not null: "+contextSymbol);
     }
     private static void assertQueryTrue(RDFConnection conn, String qs) {
         boolean b = conn.queryAsk(PREFIXES+qs);
-        assertTrue(qs, b);
+        assertTrue(b, qs);
     }
 
     private static void assertQueryFalse(RDFConnection conn, String qs) {
         boolean b = conn.queryAsk(PREFIXES+qs);
-        assertFalse(qs, b);
+        assertFalse(b, qs);
     }
 
     private FusekiServer server(int port, String configFile) {

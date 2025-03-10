@@ -65,6 +65,7 @@ public class FileOps {
 
     /**
      * Delete all files in a directory.
+     * Does not recurse in the direction.
      * Does nothing if the path name does not exist or is not a directory.
      *
      * @param dir
@@ -84,7 +85,7 @@ public class FileOps {
         clearAll(new File(d)) ;
     }
 
-    /** Delete all files and directories (recursively) in a directory */
+    /** Delete all files and directories (recursively) in a directory; does not delete the directory argument. */
     public static void clearAll(File d) {
         if ( ! d.exists() )
             return ;
@@ -199,6 +200,10 @@ public class FileOps {
         if ( iBack > iSlash )
             iSlash = iBack ;
         return iExt > iSlash ? filename.substring(iExt + 1).toLowerCase() : "" ;
+    }
+
+    public static String concatPaths(String directory, String path) {
+        return Lib.concatPaths(directory, path);
     }
 
     public static String fullPath(String filename) {

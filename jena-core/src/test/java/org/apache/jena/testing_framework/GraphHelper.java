@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 
-import org.apache.jena.graph.Factory;
+import org.apache.jena.graph.GraphMemFactory;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
@@ -205,7 +205,7 @@ public class GraphHelper extends TestUtils {
 	 * Answer a new memory-based graph with Extended prefixes.
 	 */
 	public static Graph memGraph() {
-		Graph result = Factory.createGraphMem();
+		Graph result = GraphMemFactory.createGraphMem();
 		result.getPrefixMapping().setNsPrefixes(PrefixMapping.Extended);
 		return result;
 	}
@@ -247,7 +247,7 @@ public class GraphHelper extends TestUtils {
 	 * maps already-seen bnodes to their "nice" strings.
 	 */
 	public static String nice(Graph g, Map<Node, Object> bnodes) {
-		StringBuffer b = new StringBuffer(g.size() * 100);
+		StringBuilder b = new StringBuilder(g.size() * 100);
 		ExtendedIterator<Triple> it = GraphUtil.findAll(g);
 		while (it.hasNext())
 			niceTriple(b, bnodes, it.next());
@@ -259,7 +259,7 @@ public class GraphHelper extends TestUtils {
 	 * triple <code>t</code> on a new line, using (and updating)
 	 * <code>bnodes</code> to supply "nice" strings for any blank nodes.
 	 */
-	protected static void niceTriple(StringBuffer b, Map<Node, Object> bnodes,
+	protected static void niceTriple(StringBuilder b, Map<Node, Object> bnodes,
 			Triple t) {
 		b.append("\n    ");
 		appendNode(b, bnodes, t.getSubject());
@@ -279,7 +279,7 @@ public class GraphHelper extends TestUtils {
 	 * re-use any existing string for it from <code>bnodes</code> or make a new
 	 * one of the form <i>_bNNNN</i> with NNNN a new integer.
 	 */
-	protected static void appendNode(StringBuffer b, Map<Node, Object> bnodes,
+	protected static void appendNode(StringBuilder b, Map<Node, Object> bnodes,
 			Node n) {
 		b.append(' ');
 		if (n.isBlank()) {
@@ -310,7 +310,7 @@ public class GraphHelper extends TestUtils {
 	 * <code>n.toString(PrefixMapping.Extended,true)</code>.
 	 */
 	protected static String nice(Node n) {
-		return n.toString(PrefixMapping.Extended, true);
+		return n.toString(PrefixMapping.Extended);
 	}
 
 	/**

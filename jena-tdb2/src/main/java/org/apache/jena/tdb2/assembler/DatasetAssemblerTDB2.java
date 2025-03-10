@@ -19,7 +19,7 @@
 package org.apache.jena.tdb2.assembler;
 
 import static org.apache.jena.sparql.util.graph.GraphUtils.exactlyOneProperty;
-import static org.apache.jena.sparql.util.graph.GraphUtils.getStringValue;
+import static org.apache.jena.sparql.util.graph.GraphUtils.getAsFilename;
 import static org.apache.jena.tdb2.assembler.VocabTDB2.pLocation;
 import static org.apache.jena.tdb2.assembler.VocabTDB2.pUnionDefaultGraph;
 
@@ -39,6 +39,10 @@ import org.apache.jena.tdb2.TDB2;
 
 public class DatasetAssemblerTDB2 extends DatasetAssembler
 {
+    // This is not a NamedDatasetAssembler
+    // Sharing is done by "same location" and must be system wide (not just assemblers).
+    // In-memory TDB2 dataset can use named memory locations e.g. "--mem--/NAME"
+
     static { JenaSystem.init(); }
 
     @Override
@@ -50,7 +54,7 @@ public class DatasetAssemblerTDB2 extends DatasetAssembler
         if ( !exactlyOneProperty(root, pLocation) )
             throw new AssemblerException(root, "No location given");
 
-        String dir = getStringValue(root, pLocation);
+        String dir = getAsFilename(root, pLocation);
         Location loc = Location.create(dir);
         DatasetGraph dsg = DatabaseMgr.connectDatasetGraph(loc);
 

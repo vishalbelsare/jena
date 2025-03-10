@@ -20,11 +20,9 @@ package org.apache.jena.sparql.modify;
 
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream ;
 
 import org.apache.jena.atlas.iterator.Iter;
-import org.apache.jena.ext.com.google.common.collect.Iterators;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
@@ -32,7 +30,7 @@ import org.apache.jena.sparql.core.Quad;
 import org.apache.jena.sparql.core.Substitute;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.engine.binding.Binding;
-import org.apache.jena.sparql.util.ModelUtils;
+import org.apache.jena.sparql.util.NodeUtils;
 
 public class TemplateLib {
     // See also Substitute -- combine?
@@ -65,12 +63,12 @@ public class TemplateLib {
         Stream<Quad> remappedStream = quads.stream().map(q->
             !q.isDefaultGraph() ? q : new Quad(dftGraph, q.getSubject(), q.getPredicate(), q.getObject())
         ) ;
-        return remappedStream.collect(Collectors.toList());
+        return remappedStream.toList();
     }
 
     /** Substitute into triple patterns */
     public static Iterator<Triple> calcTriples(final List<Triple> triples, Iterator<Binding> bindings) {
-        return Iterators.concat(Iter.map(bindings, new Function<Binding, Iterator<Triple>>() {
+        Function<Binding, Iterator<Triple>> mapper = new Function<>() {
             Map<Node, Node> bNodeMap = new HashMap<>();
 
             @Override
@@ -81,7 +79,7 @@ public class TemplateLib {
                 List<Triple> tripleList = new ArrayList<>(triples.size());
                 for ( Triple triple : triples ) {
                     Triple q = subst(triple, b, bNodeMap);
-                    if ( !q.isConcrete() || !ModelUtils.isValidAsStatement(q.getSubject(), q.getPredicate(), q.getObject()) ) {
+                    if ( !q.isConcrete() || ! NodeUtils.isValidAsRDF(q.getSubject(), q.getPredicate(), q.getObject()) ) {
                         // Log.warn(TemplateLib.class, "Unbound quad:
                         // "+FmtUtils.stringForQuad(quad)) ;
                         continue;
@@ -90,12 +88,13 @@ public class TemplateLib {
                 }
                 return tripleList.iterator();
             }
-        }));
+        };
+        return Iter.flatMap(bindings, mapper);
     }
 
     /** Substitute into quad patterns */
     public static Iterator<Quad> calcQuads(final List<Quad> quads, Iterator<Binding> bindings) {
-        return Iterators.concat(Iter.map(bindings, new Function<Binding, Iterator<Quad>>() {
+        Function<Binding, Iterator<Quad>> mapper = new Function<>() {
             Map<Node, Node> bNodeMap = new HashMap<>();
 
             @Override
@@ -114,7 +113,8 @@ public class TemplateLib {
                 }
                 return quadList.iterator();
             }
-        }));
+        };
+        return Iter.flatMap(bindings, mapper);
     }
 
     /** Substitute into a quad, with rewriting of bNodes */

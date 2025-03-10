@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -38,10 +38,11 @@ import org.slf4j.Logger;
  * This needs access to log4j2 binaries including log4j-core, which is encapsulated in LogCtlLog4j2.
  */
 public class LogCtl {
-    private static final boolean hasLog4j2 = hasClass("org.apache.logging.slf4j.Log4jLoggerFactory");
-    private static final boolean hasLog4j1 = hasClass("org.slf4j.impl.Log4jLoggerFactory");
-    private static final boolean hasJUL    = hasClass("org.slf4j.impl.JDK14LoggerFactory");
+    private static final boolean hasLog4j2   = hasClass("org.apache.logging.slf4j.Log4jLoggerFactory");
+    private static final boolean hasLog4j1   = hasClass("org.slf4j.impl.Log4jLoggerFactory");
     // JUL always present but needs slf4j adapter.
+    private static final boolean hasJUL      = hasClass("org.slf4j.impl.JDK14LoggerFactory");
+    private static final boolean hasLogback  = hasClass("ch.qos.logback.core.LogbackException");
     // Put per-logging system code in separate classes to avoid needing them on the classpath.
 
     private static boolean hasClass(String className) {
@@ -83,67 +84,34 @@ public class LogCtl {
         String s2 = getLevelLog4j2(logger);
         if ( s2 != null )
             return s2;
-        // Always present.
         String s3 = getLevelJUL(logger);
         if ( s3 != null )
             return s3;
         return null;
     }
 
-    static private String getLevelJUL(String logger) {
-        java.util.logging.Level level = java.util.logging.Logger.getLogger(logger).getLevel();
-        if ( level == null )
-            return null;
-        if ( level == java.util.logging.Level.SEVERE )
-            return "ERROR";
-        return level.getName();
-    }
-
     static private String getLevelLog4j2(String logger) {
         if ( !hasLog4j2 )
             return null;
-        org.apache.logging.log4j.Level level = org.apache.logging.log4j.LogManager.getLogger(logger).getLevel();
-        if ( level != null )
-            return level.toString();
-        return null;
+        return LogCtlLog4j2.getLoggerlevel(logger);
+    }
+
+    static private String getLevelJUL(String logger) {
+        if ( ! hasJUL )
+            return null;
+        return LogCtlJUL.getLevelJUL(logger);
     }
 
     private static void setLevelJUL(String logger, String levelName) {
-        java.util.logging.Level level = java.util.logging.Level.ALL;
-        if ( levelName == null )
-            level = null;
-        else if ( levelName.equalsIgnoreCase("info") )
-            level = java.util.logging.Level.INFO;
-        else if ( levelName.equalsIgnoreCase("debug") )
-            level = java.util.logging.Level.FINE;
-        else if ( levelName.equalsIgnoreCase("warn") || levelName.equalsIgnoreCase("warning") )
-            level = java.util.logging.Level.WARNING;
-        else if ( levelName.equalsIgnoreCase("error") || levelName.equalsIgnoreCase("severe") )
-            level = java.util.logging.Level.SEVERE;
-        else if ( levelName.equalsIgnoreCase("OFF") )
-            level = java.util.logging.Level.OFF;
-        java.util.logging.Logger.getLogger(logger).setLevel(level);
+        if ( ! hasJUL )
+            return ;
+        LogCtlJUL.setLevelJUL(logger, levelName);
     }
 
     private static void setLevelLog4j2(String logger, String levelName) {
         if ( !hasLog4j2 )
             return;
-        org.apache.logging.log4j.Level level = org.apache.logging.log4j.Level.ALL;
-        if ( levelName == null )
-            level = null;
-        else if ( levelName.equalsIgnoreCase("info") )
-            level = org.apache.logging.log4j.Level.INFO;
-        else if ( levelName.equalsIgnoreCase("debug") )
-            level = org.apache.logging.log4j.Level.DEBUG;
-        else if ( levelName.equalsIgnoreCase("warn") || levelName.equalsIgnoreCase("warning") )
-            level = org.apache.logging.log4j.Level.WARN;
-        else if ( levelName.equalsIgnoreCase("error") || levelName.equalsIgnoreCase("severe") )
-            level = org.apache.logging.log4j.Level.ERROR;
-        else if ( levelName.equalsIgnoreCase("fatal") )
-            level = org.apache.logging.log4j.Level.FATAL;
-        else if ( levelName.equalsIgnoreCase("OFF") )
-            level = org.apache.logging.log4j.Level.OFF;
-        LogCtlLog4j2.setLoggerlevel(logger, level);
+        LogCtlLog4j2.setLoggerlevel(logger, levelName);
     }
 
     /**
@@ -271,36 +239,47 @@ public class LogCtl {
     /**
      * @deprecated Use {@link #setLogging}.
      */
-    @Deprecated
+    @Deprecated(forRemoval = true)
     public static void setCmdLogging() {
         setLogging();
     }
 
     // ---- log4j2.
 
-    /** The log4j2 configuration file - must be a file or URL, not a classpath java resource */
-    public static final String log4j2ConfigProperty = "log4j.configurationFile";
+    /** The log4j2 configuration file - must be a file or URL, not a classpath java resource. */
+    public static final String log4j2ConfigFileProperty = "log4j2.configurationFile";
+    /** Legacy name for log4j2 configuration file */
+    public static final String log4j2ConfigFilePropertyLegacy = "log4j.configurationFile";
 
     private static final String[] log4j2files = {"log4j2.properties", "log4j2.xml"};
 
-    private static final boolean LogLogging =
-            System.getenv("JENA_LOGLOGGING") != null ||
-            System.getProperty("jena.loglogging") != null;
+    /**
+     * Environment variable for debugging logging initialization.
+     * Set "true" to get trace on stderr.
+     */
+    // Must be final for static LogLogging to work.
+    public static final String envLogLoggingProperty = "JENA_LOGLOGGING";
 
-    private static void logLogging(String str) {
+    /**
+     * Property variable for debugging logging initialization. Set "true" to get
+     * trace on stderr.
+     */
+    // Must be final for static LogLogging to work.
+    public static final String logLoggingProperty = "jena.logLogging";
+
+    private static final boolean LogLogging =
+            System.getenv(envLogLoggingProperty) != null ||
+            System.getProperty(logLoggingProperty) != null;
+
+    private static void logLogging(String fmt, Object ... args) {
         if ( LogLogging ) {
-            System.err.print("Fuseki Logging: ");
-            System.err.println(str);
+            System.err.print("Jena Logging: ");
+            System.err.printf(fmt, args);
+            System.err.println();
         }
     }
 
-//    private static void logLogging(String fmt, Object ... args) {
-//        if ( LogLogging ) {
-//            System.err.print("Fuseki Logging: ");
-//            System.err.printf(fmt, args);
-//            System.err.println();
-//        }
-//    }
+    private static boolean loggingInitialized   = false;
 
     /**
      * Setup log4j2, including looking for a file "log4j2.properties" or "log4j2.xml"
@@ -308,23 +287,37 @@ public class LogCtl {
      * @see #setLogging()
      */
     public static void setLog4j2() {
-        logLogging("Ensure Log4j2 setup");
+        if ( loggingInitialized )
+            return;
+        loggingInitialized = true;
+
         if ( ! isSetLog4j2property() ) {
+            logLogging("Set logging");
             setLog4j2property();
             if ( isSetLog4j2property() ) {
                 return;
             }
             // Nothing found - built-in default.
             logLogging("Log4j2: built-in default");
-            LogCtlLog4j2.resetLogging(LogCtlLog4j2.log4j2setup);
+            LogCtlLog4j2.reconfigureLog4j2fromString(LogCtlLog4j2.log4j2setup, LogCtlLog4j2.SyntaxHint.PROPERTIES);
         } else {
-            logLogging("Ready set: "+log4j2ConfigProperty+"="+System.getProperty(log4j2ConfigProperty));
+            if ( isSetLog4j2property(log4j2ConfigFilePropertyLegacy) )
+                logLogging("Already set: %s=%s", log4j2ConfigFilePropertyLegacy, System.getProperty(log4j2ConfigFilePropertyLegacy));
+            else
+                logLogging("Already set: %s=%s", log4j2ConfigFileProperty, System.getProperty(log4j2ConfigFileProperty));
         }
     }
 
     /* package */ static boolean isSetLog4j2property() {
-        return System.getProperty(log4j2ConfigProperty) != null;
+        // Either name,
+        return isSetLog4j2property(log4j2ConfigFileProperty) ||
+               isSetLog4j2property(log4j2ConfigFilePropertyLegacy);
     }
+
+    private static boolean isSetLog4j2property(String systemProperty) {
+        return System.getProperty(systemProperty) != null;
+    }
+
 
     /** Set log4j, looking for files */
     /*package*/ static void setLog4j2property() {
@@ -333,7 +326,9 @@ public class LogCtl {
         for ( String fn : log4j2files ) {
             File f = new File(fn);
             if ( f.exists() ) {
-                System.setProperty(log4j2ConfigProperty, "file:" + fn);
+                String fileURL = "file:"+fn;
+                logLogging("Set %s=%s", log4j2ConfigFileProperty, fileURL);
+                System.setProperty(log4j2ConfigFileProperty, fileURL);
                 return;
             }
         }

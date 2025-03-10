@@ -22,16 +22,14 @@ import static org.apache.jena.fuseki.validation.html.ValidatorHtmlLib.*;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.Iterator;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.jena.iri.IRI;
-import org.apache.jena.iri.IRIFactory;
-import org.apache.jena.iri.Violation;
-import org.apache.jena.irix.SetupJenaIRI;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.jena.iri3986.provider.IRIProvider3986;
+import org.apache.jena.irix.IRIException;
+import org.apache.jena.irix.IRIProvider;
+import org.apache.jena.irix.IRIx;
 
 public class IRIValidatorHTML
 {
@@ -39,7 +37,6 @@ public class IRIValidatorHTML
     { }
 
     static final String paramIRI      = "iri";
-    static IRIFactory iriFactory = SetupJenaIRI.iriCheckerFactory();
 
     public static void executeHTML(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         try {
@@ -65,26 +62,37 @@ public class IRIValidatorHTML
 
             try {
                 boolean first = true;
+                IRIProvider provider = new IRIProvider3986();
+
                 for ( String iriStr : args ) {
+                    if ( iriStr.startsWith("<") ) {
+                        iriStr = iriStr.substring(1);
+                        if ( iriStr.endsWith(">") )
+                            iriStr = iriStr.substring(0,iriStr.length()-1);
+                    }
                     if ( !first )
                         System.out.println();
                     first = false;
+                    try {
+                        IRIx iri = provider.create(iriStr);
+                        System.out.println(iriStr + " ==> " + iri);
+                        if ( iri.isRelative() )
+                            System.out.println("Relative IRI: " + iriStr);
 
-                    IRI iri = iriFactory.create(iriStr);
-                    System.out.println(iriStr + " ==> " + iri);
-                    if ( iri.isRelative() )
-                        System.out.println("Relative IRI: " + iriStr);
-
-                    Iterator<Violation> vIter = iri.violations(true);
-                    for (; vIter.hasNext(); ) {
-                        String str = vIter.next().getShortMessage();
-                        str = htmlQuote(str);
-
-                        System.out.println(str);
+                        if ( iri.hasViolations() ) {
+                            System.out.println();
+                            iri.handleViolations((error,msg)->{
+                                String str = htmlQuote(msg);
+                                String category = (error)?"Error":"Warning";
+                                System.out.printf("  %-7s : %s\n", category, str);
+                            });
+                        }
+                    } catch (IRIException ex) {
+                        System.out.println(iriStr);
+                        System.out.println("Bad IRI: "+ex.getMessage());
                     }
                 }
-            }
-            finally {
+            } finally {
                 finishFixed(outStream);
                 System.out.flush();
                 System.err.flush();

@@ -19,6 +19,7 @@
 package shacl;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
@@ -26,7 +27,6 @@ import java.util.stream.Stream;
 
 import org.apache.jena.atlas.io.IO;
 import org.apache.jena.atlas.io.IndentedWriter;
-import org.apache.jena.atlas.lib.StreamOps;
 import org.apache.jena.atlas.logging.LogCtl;
 import org.apache.jena.cmd.ArgDecl;
 import org.apache.jena.cmd.CmdException;
@@ -97,11 +97,11 @@ public class shacl_parse extends CmdGeneral {
                  String[] a = x.split(",");
                  return Arrays.stream(a);
              };
-             List<String> values =
-                 StreamOps.toList(getValues(argOutput).stream()
+             List<String> outputValues = getValues(argOutput).stream()
                      .flatMap(f)
                      .map(s->s.toLowerCase())
-                     );
+                     .toList();
+             List<String> values = new ArrayList<>(outputValues); // Mutable.
              printText = values.remove("text") || values.remove("t");
              printCompact = values.remove("compact") || values.remove("c");
              printRDF = values.remove("rdf") || values.remove("r") || values.remove("ttl");

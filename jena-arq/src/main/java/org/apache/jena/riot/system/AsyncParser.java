@@ -28,20 +28,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
-
 import org.apache.jena.atlas.iterator.IteratorCloseable;
 import org.apache.jena.atlas.iterator.IteratorSlotted;
 import org.apache.jena.atlas.lib.InternalErrorException;
 import org.apache.jena.atlas.logging.FmtLog;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
-import org.apache.jena.riot.Lang;
-import org.apache.jena.riot.RDFParser;
-import org.apache.jena.riot.RDFParserBuilder;
-import org.apache.jena.riot.RiotException;
-import org.apache.jena.riot.SysRIOT;
-import org.apache.jena.riot.lang.RiotParsers;
+import org.apache.jena.riot.*;
+import org.apache.jena.riot.lang.IteratorParsers;
 import org.apache.jena.sparql.core.Quad;
 import org.apache.jena.util.iterator.ClosableIterator;
 import org.slf4j.Logger;
@@ -129,7 +123,7 @@ public class AsyncParser {
     /**
      * Pull parser - triples.
      * <p>
-     * See also {@link RiotParsers#createIteratorNTriples}.
+     * See also {@link IteratorParsers#createIteratorNTriples}.
      */
     public static IteratorCloseable<Triple> asyncParseTriples(InputStream input, Lang lang, String baseURI) {
         return AsyncParser.of(input, lang, baseURI).asyncParseTriples();
@@ -148,7 +142,7 @@ public class AsyncParser {
     /**
      * Pull parser - quads.
      * <p>
-     * See also {@link RiotParsers#createIteratorNQuads}.
+     * See also {@link IteratorParsers#createIteratorNQuads}.
      */
     public static IteratorCloseable<Quad> asyncParseQuads(InputStream input, Lang lang, String baseURI) {
         return AsyncParser.of(input, lang, baseURI).asyncParseQuads();
@@ -193,7 +187,7 @@ public class AsyncParser {
     private static List<RDFParserBuilder> urlsToSource(List<String> filesOrURLs) {
         return filesOrURLs.stream().map(
                     uriOrFile -> RDFParser.source(uriOrFile).errorHandler(dftErrorHandler))
-            .collect(Collectors.toList());
+            .toList();
     }
 
     /** Create a source object from the given arguments that is suitable for use with
@@ -209,8 +203,7 @@ public class AsyncParser {
      * Any other type of throwable raises a generic RuntimeException with it as the cause.
      */
     private static void raiseException(Throwable throwable) {
-        if (throwable instanceof RuntimeException) {
-            RuntimeException e = (RuntimeException)throwable;
+        if (throwable instanceof RuntimeException e) {
             e.addSuppressed(new RuntimeException("Encountered error element from parse thread"));
             throw e;
         }

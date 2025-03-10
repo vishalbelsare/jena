@@ -25,36 +25,25 @@
   <parent>
     <groupId>org.apache.jena</groupId>
     <artifactId>jena-extras</artifactId>
-    <relativePath>..</relativePath>
-    <version>4.8.0-SNAPSHOT</version>
+    <version>5.4.0-SNAPSHOT</version>
   </parent>
 
   <properties>
     <automatic.module.name>org.apache.jena.querybuilder</automatic.module.name>
+    <argLine />
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.jena</groupId>
-      <artifactId>apache-jena-libs</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
-      <type>pom</type>
+      <artifactId>jena-arq</artifactId>
+      <version>5.4.0-SNAPSHOT</version>
     </dependency>
 
     <dependency>
       <groupId>org.xenei</groupId>
       <artifactId>junit-contracts</artifactId> 
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>commons-cli</artifactId>
-          <groupId>commons-cli</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>commons-logging</artifactId>
-          <groupId>commons-logging</groupId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -70,14 +59,14 @@
     </dependency>
 
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
       <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
+      <artifactId>log4j-slf4j2-impl</artifactId>
       <scope>test</scope>
     </dependency>
 
@@ -95,13 +84,35 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
-          <detectJavaApiLink>false</detectJavaApiLink>
-          <source>8</source>
-          <doclint>none</doclint>
           <windowtitle>Apache Jena Query Builder</windowtitle>
           <doctitle>Apache Jena - Query Builder ${project.version}</doctitle>
         </configuration>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <!--
+              sets a property for the artifact file
+              groupId:artifactId:type:[classifier]
+              Used with mockito.
+              Also - define a default value for argLine in <properties>
+          -->
+          <executions>
+            <execution>
+              <goals>
+                <goal>properties</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
 
     </plugins>
   </build>

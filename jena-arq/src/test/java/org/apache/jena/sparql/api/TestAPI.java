@@ -18,17 +18,12 @@
 
 package org.apache.jena.sparql.api;
 
-import static org.junit.Assert.*;
-
-import java.util.Iterator;
-import java.util.Set ;
-
-import org.apache.jena.atlas.iterator.Iter ;
+import org.apache.jena.atlas.iterator.Iter;
 import org.apache.jena.atlas.json.JsonArray;
 import org.apache.jena.atlas.json.JsonObject;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
-import org.apache.jena.graph.Graph ;
-import org.apache.jena.graph.Node ;
+import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.DatasetFactory;
@@ -62,6 +57,16 @@ import org.apache.jena.vocabulary.OWL;
 import org.apache.jena.vocabulary.RDF;
 import org.junit.Test;
 
+import java.util.Iterator;
+import java.util.Set;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+
 public class TestAPI
 {
     private static final String ns = "http://example/ns#" ;
@@ -86,6 +91,7 @@ public class TestAPI
         d.addNamedModel(g1.getURI(), m);
     }
 
+    @SuppressWarnings("removal")
     @Test public void testInitialBindingsConstruct1()
     {
         QuerySolutionMap init = new QuerySolutionMap() ;
@@ -102,6 +108,7 @@ public class TestAPI
         }
     }
 
+    @SuppressWarnings("removal")
     @Test public void testInitialBindingsConstruct2()
     {
         QuerySolutionMap init = new QuerySolutionMap() ;
@@ -167,6 +174,7 @@ public class TestAPI
         assertTrue(smap2.contains("o")) ;
     }
 
+    @SuppressWarnings("removal")
     @Test public void testInitialBindings1()
     {
         QuerySolutionMap init = new QuerySolutionMap() ;
@@ -180,6 +188,7 @@ public class TestAPI
         }
     }
 
+    @SuppressWarnings("removal")
     @Test public void testInitialBindings2()
     {
         QuerySolutionMap init = new QuerySolutionMap() ;
@@ -193,6 +202,7 @@ public class TestAPI
         }
     }
 
+    @SuppressWarnings("removal")
     @Test public void testInitialBindings3()
     {
         QuerySolutionMap init = new QuerySolutionMap() ;
@@ -207,6 +217,7 @@ public class TestAPI
         }
     }
 
+    @SuppressWarnings("removal")
     @Test public void testInitialBindings4()
     {
         // Test derived from report by Holger Knublauch
@@ -238,6 +249,7 @@ public class TestAPI
     /**
      * Initial binding substitution happens before optimization so initial bindings can make a semantically always false query into one that can return true
      */
+    @SuppressWarnings("removal")
     @Test public void testInitialBindings5() {
         // From JENA-500
         Query query = QueryFactory.create(
@@ -260,6 +272,7 @@ public class TestAPI
     /**
      * Initial binding substitution happens before optimization so initial bindings can make a semantically always false query into one that can return true
      */
+    @SuppressWarnings("removal")
     @Test public void testInitialBindings6() {
         // From JENA-500
         Query query = QueryFactory.create(
@@ -286,11 +299,11 @@ public class TestAPI
         Dataset ds = DatasetFactory.create();
         QuerySolutionMap initialBinding = new QuerySolutionMap();
         initialBinding.add("a", ResourceFactory.createTypedLiteral(Boolean.TRUE));
-        try ( QueryExecution qexec = QueryExecutionFactory.create(query, ds, initialBinding) ) {
-            assertFalse(qexec.execSelect().next().contains("a"));
+        try ( QueryExecution qExec = QueryExecution
+                .dataset(ds).query(query).substitution(initialBinding).build() ) {
+            assertFalse(qExec.execSelect().next().contains("a"));
         }
     }
-
 
     @Test public void testReuseQueryObject1()
     {

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,15 +20,15 @@ package org.apache.jena.riot.resultset;
 
 import org.apache.jena.riot.resultset.rw.TestResultSetWriterCSV;
 import org.apache.jena.riot.resultset.rw.TestResultSetWriterTSV;
-import org.junit.runner.RunWith ;
-import org.junit.runners.Suite ;
+import org.junit.platform.suite.api.*;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses( {
+@Suite
+@SelectClasses({
     TestResultSetIO.class
+    , TestResultSetLang.class
     , TestResultSetWriterCSV.class
     , TestResultSetWriterTSV.class
-})
+    , TestResultSetLang.class
+    })
 
 public class TS_ResultSetRIOT { }
-

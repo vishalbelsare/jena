@@ -18,22 +18,25 @@
 
 package org.apache.jena.fuseki.main.access;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses( {
+@Suite
+@SelectClasses({
     TestAuthorized.class
+    , TestSimpleBearer.class
+
     , TestSecurityFilterFuseki.class
     , TestFusekiSecurityAssemblerSeparate.class
     , TestFusekiSecurityAssemblerShared.class
 
     , TestSecurityConfig.class
     , TestSecurityBuilderSetup.class
-    
+
     , TestPasswdOnly.class
     , TestServiceDataAuthConfig.class
     , TestServiceDataAuthBuild.class
+
 })
 
 public class TS_SecurityFuseki {}

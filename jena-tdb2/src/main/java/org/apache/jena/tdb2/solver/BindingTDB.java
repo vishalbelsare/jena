@@ -26,6 +26,7 @@ import org.apache.jena.riot.out.NodeFmtLib;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.engine.binding.BindingBase;
+import org.apache.jena.sparql.engine.binding.BindingFactory;
 import org.apache.jena.tdb2.TDBException;
 import org.apache.jena.tdb2.store.NodeId;
 import org.apache.jena.tdb2.store.nodetable.NodeTable;
@@ -105,8 +106,8 @@ public class BindingTDB extends BindingBase
 
         if ( parent == null )
             return null;
-        if ( parent instanceof BindingTDB )
-            return ((BindingTDB)parent).getNodeId(var);
+        if ( parent instanceof BindingTDB bindingTDB )
+            return bindingTDB.getNodeId(var);
         return null;
     }
 
@@ -149,7 +150,7 @@ public class BindingTDB extends BindingBase
     }
 
     @Override
-    protected void fmtVar(StringBuffer sbuff, Var var)
+    protected void fmtVar(StringBuilder sbuff, Var var)
     {
         NodeId id = idBinding.get(var);
         String extra = "";
@@ -158,5 +159,15 @@ public class BindingTDB extends BindingBase
         Node node = get(var);
         String tmp = NodeFmtLib.displayStr(node);
         sbuff.append("( ?"+var.getVarName()+extra+" = "+tmp+" )");
+    }
+
+    @Override
+    public Binding detach() {
+        return BindingFactory.copy(this);
+    }
+
+    @Override
+    protected Binding detachWithNewParent(Binding newParent) {
+        throw new UnsupportedOperationException("Should never be called.");
     }
 }

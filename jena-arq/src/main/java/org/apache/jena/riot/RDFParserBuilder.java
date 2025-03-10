@@ -28,9 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.apache.jena.atlas.lib.IRILib;
-import org.apache.jena.graph.BlankNodeId;
 import org.apache.jena.graph.Graph;
-import org.apache.jena.http.HttpEnv;
 import org.apache.jena.irix.IRIs;
 import org.apache.jena.irix.IRIxResolver;
 import org.apache.jena.query.Dataset;
@@ -43,6 +41,7 @@ import org.apache.jena.sparql.core.DatasetGraph;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.sparql.util.ContextAccumulator;
 import org.apache.jena.sparql.util.Symbol;
+import org.apache.jena.sys.JenaSystem;
 
 /**
  * An {@link RDFParser} is a process that will generate triples;
@@ -68,6 +67,8 @@ import org.apache.jena.sparql.util.Symbol;
  * </pre>
  */
 public class RDFParserBuilder {
+    static { JenaSystem.init(); }
+
     // The various sources
     // Reusable parser
     private String uri = null;
@@ -265,12 +266,6 @@ public class RDFParserBuilder {
         return this;
     }
 
-    /** @deprecated Use {@link #acceptHeader} */
-    @Deprecated
-    public RDFParserBuilder httpAccept(String acceptHeader) {
-        return acceptHeader(acceptHeader);
-    }
-
     /**
      * Set an HTTP header. Any previous setting is lost.
      * <p>
@@ -282,13 +277,16 @@ public class RDFParserBuilder {
         return this;
     }
 
-//    /** Set the HttpClient to use.
-//     *  This will override any HTTP header settings set for this builder.
-//     */
-//    public RDFParserBuilder httpClient(HttpClient httpClient) {
-//        this.httpClient = httpClient;
-//        return this;
-//    }
+    /**
+     * Set an HTTP client. Any previous setting is lost.
+     * <p>
+     * Consider setting up an {@link HttpClient} if more complicated
+     * setting to an HTTP request is required.
+     */
+    public RDFParserBuilder httpClient(HttpClient httpClient) {
+        this.httpClient = httpClient;
+        return this;
+    }
 
     /** Set the base URI for parsing.  The default is to have no base URI. */
     public RDFParserBuilder base(String base) { this.baseURI = base ; return this; }
@@ -322,30 +320,6 @@ public class RDFParserBuilder {
      */
     public RDFParserBuilder prefixes(PrefixMap prefixMap) {
         this.prefixMap = prefixMap == null ? null : PrefixMapFactory.create(prefixMap);
-        return this;
-    }
-
-    /**
-     * Convert the lexical form of literals to a canonical form.
-     * @deprecated Use {@link #canonicalValues} and one of {@link #langTagCanonical} and {@link #langTagLowerCase}
-     * <p>
-     * This operation is equivalent to
-     * <pre>
-     *   this.canonicalValues(flag);
-     *    if ( flag )
-     *        this.langTagCanonical();
-     *    else
-     *        this.langTagAsGiven();
-     *    return this;
-     * </pre>
-     */
-    @Deprecated
-    public RDFParserBuilder canonicalLiterals(boolean flag) {
-        this.canonicalValues(flag);
-        if ( flag )
-            this.langTagCanonical();
-        else
-            this.langTagAsGiven();
         return this;
     }
 
@@ -400,7 +374,9 @@ public class RDFParserBuilder {
      * This option can slow parsing down.
      *
      * @see #langTagCanonical
+     * @deprecated In Jena5, language tags are always converted to RFC 5646 case format.
      */
+    @Deprecated
     public RDFParserBuilder langTagLowerCase() {
         return langTagForm(LangTagForm.LOWER_CASE);
     }
@@ -419,7 +395,9 @@ public class RDFParserBuilder {
      * This option can slow parsing down.
      * </p>
      * @see #langTagLowerCase
+     * @deprecated In Jena5, language tags are always converted to RFC 5646 case format.
      */
+    @Deprecated
     public RDFParserBuilder langTagCanonical() {
         return langTagForm(LangTagForm.CANONICAL);
     }
@@ -429,13 +407,17 @@ public class RDFParserBuilder {
      * This is the default behaviour of parsing.
      * @see #langTagLowerCase
      * @see #langTagCanonical
+     * @deprecated In Jena5, language tags are always converted to RFC 5646 case format.
      */
+    @Deprecated
     public RDFParserBuilder langTagAsGiven() {
         return langTagForm(LangTagForm.NONE);
     }
 
     private RDFParserBuilder langTagForm(LangTagForm form) {
-        this.langTagForm = form;
+        // Ignore!
+        // language tags are always converted to RFC 5646 case format.
+        //this.langTagForm = form;
         return this;
     }
 
@@ -475,7 +457,7 @@ public class RDFParserBuilder {
      * reuse.
      * <br/>
      * The {@code FactoryRDF} also determines how blank node labels in RDF syntax are
-     * mapped to {@link BlankNodeId}. Use
+     * mapped to blank node objects.
      * <pre>
      *    new Factory(myLabelToNode)
      * </pre>
@@ -667,8 +649,6 @@ public class RDFParserBuilder {
             throw new RiotException("No source specified");
         Context context = contextAcc.context();
 
-        // Setup the HTTP client.
-        HttpClient clientJDK = ( httpClient != null ) ? httpClient : HttpEnv.getDftHttpClient();
         FactoryRDF factory$ = buildFactoryRDF();
         ErrorHandler errorHandler$ = errorHandler;
         if ( errorHandler$ == null )
@@ -696,7 +676,7 @@ public class RDFParserBuilder {
         // Can't build the profile here as it is Lang/conneg dependent.
         return new RDFParser(uri, path, stringToParse, inputStream, javaReader, sMgr,
                              appAcceptHeader, httpHeaders,
-                             clientJDK,
+                             httpClient,
                              hintLang, forceLang,
                              parserBaseURI, strict, checking,
                              canonicalValues, langTagForm,

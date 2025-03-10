@@ -18,10 +18,7 @@
 
 package org.apache.jena.update;
 
-import org.apache.jena.sparql.core.DatasetGraph ;
-import org.apache.jena.sparql.exec.UpdateExecDatasetBuilder;
-import org.apache.jena.sparql.exec.http.UpdateExecHTTPBuilder;
-import org.apache.jena.sparql.util.Context ;
+import org.apache.jena.sparql.util.Context;
 
 /**
  * An instance of a execution of an UpdateRequest.
@@ -29,25 +26,12 @@ import org.apache.jena.sparql.util.Context ;
  */
 public interface UpdateProcessor
 {
-    /**
-     * The properties associated with a query execution -
-     * implementation specific parameters  This includes
-     * Java objects (so it is not an RDF graph).
-     * Keys should be URIs as strings.
-     * May be null (this implementation does not provide any configuration).
-     * @deprecated UpdateProcessors are now built with the builder {@link UpdateExecDatasetBuilder} and {@link UpdateExecHTTPBuilder}.
-     */
-    @Deprecated
-    public default Context getContext() { return null; }
-
-    /**
-     * The dataset against which the query will execute.
-     * May be null, implying the there isn't a local GraphStore target for this UpdateProcessor.
-     * @deprecated
-     */
-    @Deprecated
-    public default DatasetGraph getDatasetGraph() { return null; }
-
     /** Execute */
     public void execute() ;
+
+    /** Attempt to asynchronously abort an update execution. */
+    public default void abort() { }
+
+    /** Returns the processor's context. Null if there is none. */
+    public default Context getContext() { return null ; }
 }

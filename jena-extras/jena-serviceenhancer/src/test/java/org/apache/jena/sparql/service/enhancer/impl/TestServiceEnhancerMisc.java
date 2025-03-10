@@ -18,7 +18,7 @@
 
 package org.apache.jena.sparql.service.enhancer.impl;
 
-import org.apache.jena.ext.com.google.common.base.StandardSystemProperty;
+import com.google.common.base.StandardSystemProperty;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.query.ARQ;
 import org.apache.jena.query.Dataset;
@@ -503,7 +503,7 @@ public class TestServiceEnhancerMisc {
             "   SERVICE <loop:cache:bulk+5> { ?s rdfs:label ?l }",
             "}");
 
-        Dataset ds = RDFParser.fromString(dataStr).lang(Lang.TURTLE).toDataset();
+        Dataset ds = RDFParser.fromString(dataStr, Lang.TURTLE).toDataset();
         Query query = QueryFactory.create(queryStr);
 
         int rsSize;

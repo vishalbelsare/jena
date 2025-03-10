@@ -57,7 +57,7 @@ public class LoaderFactory {
     }
 
     /**
-     * A simple loader loader to load a single graph in the destination {@code DatasetGraph}.
+     * A simple loader to load a single graph in the destination {@code DatasetGraph}.
      * <p>
      * Use {@link Quad#defaultGraphIRI} to load the default graph.
      * <p>
@@ -66,7 +66,7 @@ public class LoaderFactory {
      * other quad data is discarded.
      * <p>
      * For other behaviours, use {@link #basicLoader(DatasetGraph, MonitorOutput)}
-     * and wrap the {@linkStreamRDF} from {@link DataLoader#stream()}) with the required
+     * and wrap the {@link StreamRDF} from {@link DataLoader#stream()}) with the required
      * transformation.
      *
      * @see #basicLoader(DatasetGraph, MonitorOutput)
@@ -104,7 +104,7 @@ public class LoaderFactory {
      * other quad data is discarded.
      * <p>
      * For other behaviours, use {@link #basicLoader(DatasetGraph, MonitorOutput)}
-     * and wrap the {@linkStreamRDF} from {@link DataLoader#stream()}) with the required
+     * and wrap the {@link StreamRDF} from {@link DataLoader#stream()}) with the required
      * transformation.
      *
      * @see #sequentialLoader(DatasetGraph, MonitorOutput)

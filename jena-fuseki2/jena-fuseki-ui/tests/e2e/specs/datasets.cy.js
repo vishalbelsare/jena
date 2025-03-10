@@ -22,34 +22,53 @@
  * add new datasets. So we also cover parts of the Manage view.
  */
 describe('datasets', () => {
-  it('Visits datasets page, also the application landing-page', () => {
-    cy.visit('/')
-    cy
-      .contains('Loading')
-      .should('not.exist')
-    cy
-      .get('h2.text-center')
-      .contains('Apache Jena Fuseki')
-    cy
-      .get('tr.jena-table-empty')
-      .contains('No datasets created')
-  })
-  it('Filters without any data', () => {
-    cy.visit('/')
-    cy
-      .contains('Loading')
-      .should('not.exist')
-    cy
-      .get('#filterInput')
-      .type('pumpkin')
-    cy
-      .get('tr.jena-table-empty-filtered')
-      .contains('No datasets found')
-  })
-  describe('After creating new datasets', () => {
+  describe('without any datasets', () => {
     before(() => {
       // Special endpoint that clears the datasets data.
-      cy.request('/tests/reset')
+      cy.request({
+        url: '/tests/reset',
+        retryOnStatusCodeFailure: true
+      })
+    })
+    after(() => {
+      // Special endpoint that clears the datasets data.
+      cy.request({
+        url: '/tests/reset',
+        retryOnStatusCodeFailure: true
+      })
+    })
+    it('Visits datasets page, also the application landing-page', () => {
+      cy.visit('/')
+      cy
+        .contains('Loading')
+        .should('not.exist')
+      cy
+        .get('h2.text-center')
+        .contains('Apache Jena Fuseki')
+      cy
+        .get('tr.jena-table-empty')
+        .contains('No datasets created')
+    })
+    it('Filters without any data', () => {
+      cy.visit('/')
+      cy
+        .contains('Loading')
+        .should('not.exist')
+      cy
+        .get('#filterInput')
+        .type('pumpkin')
+      cy
+        .get('tr.jena-table-empty-filtered')
+        .contains('No datasets found')
+    })
+  })
+  describe('after creating new datasets', () => {
+    before(() => {
+      // Special endpoint that clears the datasets data.
+      cy.request({
+        url: '/tests/reset',
+        retryOnStatusCodeFailure: true
+      })
       for (const datasetName of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k']) {
         // NOTE: Cypress appears to get confused when re-using the same URL,
         //       so we use a ?temp=... in the URL to force distinct requests.
@@ -74,11 +93,17 @@ describe('datasets', () => {
     })
     after(() => {
       // Special endpoint that clears the datasets data.
-      cy.request('/tests/reset')
+      cy.request({
+        url: '/tests/reset',
+        retryOnStatusCodeFailure: true
+      })
     })
     it('Edits the graph', () => {
       cy.visit('/#/dataset/a/edit')
-      cy.intercept('/a*').as('getGraph')
+      cy.intercept({
+        method: 'GET',
+        url: '/a/data*'
+      }).as('getGraph')
       cy
         .contains('Loading')
         .should('not.exist')
@@ -117,7 +142,7 @@ describe('datasets', () => {
         .eq(0)
         .find('a')
         .first()
-        .click()
+        .click({ force: true })
       cy.wait('@getGraph')
       cy
         .get('.CodeMirror-code')
@@ -287,7 +312,7 @@ describe('datasets', () => {
         .should('be.visible')
       // Dataset Size displays no data by default.
       cy
-        .get('table#dataset-size-table > tbody > tr > td')
+        .get('#dataset-size-table * table > tbody > tr > td')
         .should('contain', 'No data')
       // Count the triples.
       cy
@@ -301,19 +326,19 @@ describe('datasets', () => {
         .should('not.exist')
       // Now the table must have the new column header and body.
       cy
-        .get('table#dataset-size-table > thead > tr > th')
+        .get('#dataset-size-table * table > thead > tr > th')
         .eq(0)
         .should('contain', 'graph name')
       cy
-        .get('table#dataset-size-table > thead > tr > th')
+        .get('#dataset-size-table * table > thead > tr > th')
         .eq(1)
         .should('contain', 'triples')
       cy
-        .get('table#dataset-size-table > tbody > tr > td')
+        .get('#dataset-size-table * table > tbody > tr > td')
         .eq(0)
         .should('contain', 'default graph')
       cy
-        .get('table#dataset-size-table > tbody > tr > td')
+        .get('#dataset-size-table * table > tbody > tr > td')
         .eq(1)
         .should('contain', '42')
     })

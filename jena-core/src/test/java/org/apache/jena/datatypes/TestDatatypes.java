@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,12 +20,15 @@ package org.apache.jena.datatypes;
 
 import static org.junit.Assert.assertEquals ;
 import static org.junit.Assert.assertFalse ;
+import static org.junit.Assert.assertNotEquals ;
 import static org.junit.Assert.assertNotNull ;
 import static org.junit.Assert.assertTrue ;
 
 import java.math.BigDecimal ;
+import java.util.UUID;
 
 import org.apache.jena.datatypes.xsd.XSDDatatype ;
+import org.apache.jena.datatypes.xsd.impl.XSDDouble ;
 import org.apache.jena.graph.Node ;
 import org.apache.jena.graph.NodeFactory ;
 import org.apache.jena.rdf.model.Resource ;
@@ -39,6 +42,7 @@ public class TestDatatypes {
     public XSDDatatype xsdDuration = XSDDatatype.XSDduration ;
     public XSDDatatype xsdYearMonthDuration = XSDDatatype.XSDyearMonthDuration ;
     public XSDDatatype xsdDayTimeDuration = XSDDatatype.XSDdayTimeDuration ;
+    public XSDDatatype xsdLanguage = XSDDatatype.XSDlanguage ;
 
     @Test public void registration_01()   { checkRegistration1("dateTime", XSD.dateTime); }
     @Test public void registration_02()   { checkRegistration1("dateTimeStamp", XSD.dateTimeStamp); }
@@ -145,6 +149,32 @@ public class TestDatatypes {
         invalid(xsdDayTimeDuration, "P1DT") ;
     }
 
+    @Test public void language_01() {
+        valid(xsdLanguage, "en") ;
+        valid(xsdLanguage, "en-UK") ;
+        valid(xsdLanguage, "es-419") ;
+    }
+
+    @Test public void language_02() {
+        invalid(xsdLanguage, "-") ;
+        invalid(xsdLanguage, "en-") ;
+        invalid(xsdLanguage, "-en-UK") ;
+        invalid(xsdLanguage, "-es-419-") ;
+    }
+
+    @Test public void language_03() {
+        valid(xsdLanguage, "zh-Hans") ;
+        valid(xsdLanguage, "zh-Hant-HK") ;
+        valid(xsdLanguage, "de-CH-1901") ;
+        valid(xsdLanguage, "de-DE-u-co-phonebk") ;
+    }
+
+    @Test public void language_04() {
+        // non-ASCII characters are not allowed
+        // (here: "goose" in Polish)
+        invalid(xsdLanguage, "gęś") ;
+    }
+
     @Test public void valueToLex_bigdecimal_01() {
         testValueToLex(new BigDecimal("0.004"), XSDDatatype.XSDdecimal) ;
     }
@@ -177,9 +207,98 @@ public class TestDatatypes {
         testValueToLex(Float.NEGATIVE_INFINITY, XSDDatatype.XSDfloat) ;
     }
 
+    @Test public void passAsString_UUID() {
+        testLiteralIsCorrectType(UUID.randomUUID(), XSDDatatype.XSDstring) ;
+    }
+
+    @Test public void passAsString_Integer() {
+        testLiteralIsCorrectType(5, XSDDatatype.XSDstring) ;
+    }
+
+    @Test public void passAsString_Float() {
+        testLiteralIsCorrectType(9.99f, XSDDatatype.XSDstring) ;
+    }
+    @Test public void passAsInteger_String() {
+        testLiteralIsCorrectType("5", XSDDatatype.XSDint) ;
+    }
+
+    @Test public void passAsFloat_String() {
+        testLiteralIsCorrectType("5.55", XSDDatatype.XSDfloat) ;
+    }
+
+    @Test public void baseDataTypeEquality() {
+        var rdfDataType1 = new BaseDatatype("urn:x-hp-dt:unknown");
+        assertEquals(rdfDataType1, rdfDataType1);
+
+        var rdfDataType2 = new BaseDatatype("urn:x-hp-dt:unknown");
+        assertEquals(rdfDataType1, rdfDataType2);
+        assertEquals(rdfDataType2, rdfDataType1);
+
+        assertEquals(rdfDataType1.hashCode(), rdfDataType2.hashCode());
+    }
+
+    @Test public void baseDataTypeEmptyEquality() {
+        var rdfDataType1 = new BaseDatatype("");
+        assertEquals(rdfDataType1, rdfDataType1);
+
+        var rdfDataType2 = new BaseDatatype("");
+        assertEquals(rdfDataType1, rdfDataType2);
+        assertEquals(rdfDataType2, rdfDataType1);
+
+        assertEquals(rdfDataType1.hashCode(), rdfDataType2.hashCode());
+    }
+
+    @Test public void baseDataTypeNullEquality() {
+        var rdfDataType1 = new BaseDatatype(null);
+        assertEquals(rdfDataType1, rdfDataType1);
+
+        var rdfDataType2 = new BaseDatatype(null);
+        assertEquals(rdfDataType1, rdfDataType2);
+        assertEquals(rdfDataType2, rdfDataType1);
+
+        assertEquals(rdfDataType1.hashCode(), rdfDataType2.hashCode());
+    }
+
+    @Test public void xsdDoubleEquality() {
+        var rdfDataType1 = new XSDDouble("double", Double.class);
+        assertEquals(rdfDataType1, rdfDataType1);
+
+        var rdfDataType2 = XSDDatatype.XSDdouble;
+        assertEquals(rdfDataType1, rdfDataType2);
+        assertEquals(rdfDataType2, rdfDataType1);
+
+        assertEquals(rdfDataType1.hashCode(), rdfDataType2.hashCode());
+    }
+
+    @Test public void baseDataTypeNotEquals() {
+        var rdfDataType1 = new BaseDatatype("urn:x-hp-dt:unknownA");
+        var rdfDataType2 = new BaseDatatype("urn:x-hp-dt:unknownB");
+
+        assertNotEquals(rdfDataType1, rdfDataType2);
+        assertNotEquals(rdfDataType2, rdfDataType1);
+    }
+
+    @Test public void baseDataTypeNullNotEquals() {
+        var rdfDataType1 = new BaseDatatype("urn:x-hp-dt:unknownA");
+        var rdfDataType2 = new BaseDatatype(null);
+
+        assertNotEquals(rdfDataType1, rdfDataType2);
+        assertNotEquals(rdfDataType2, rdfDataType1);
+    }
+
+    @Test public void hashCodeEqualsUriHashCode() {
+        var rdfDataType = new BaseDatatype("urn:x-hp-dt:unknown");
+        assertEquals(rdfDataType.getURI().hashCode(), rdfDataType.hashCode());
+    }
+
     private void testValueToLex(Object value, XSDDatatype datatype) {
         Node node = NodeFactory.createLiteralByValue(value, datatype) ;
         assertTrue("Not valid lexical form "+value+" -> "+node, datatype.isValid(node.getLiteralLexicalForm())) ;
+    }
+
+    private void testLiteralIsCorrectType(Object value, XSDDatatype datatype) {
+        Node node = NodeFactory.createLiteralByValue(value, datatype) ;
+        assertEquals("If passing object of type " + value.getClass().getSimpleName() + " as " + datatype.toString() + " it needs to be treated as " + datatype.getJavaClass().getSimpleName(), node.getLiteralValue().getClass(), datatype.getJavaClass());
     }
 
     private void valid(XSDDatatype xsddatatype, String string) {

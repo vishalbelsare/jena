@@ -44,6 +44,7 @@ public abstract class ExecHTTPBuilder<X, Y> {
     protected String serviceURL = null;
     private Query query = null;
     protected String queryString = null;
+    protected boolean parseCheck = true;
     private HttpClient httpClient = null;
     protected Map<String, String> httpHeaders = new HashMap<>();
     protected Params params = Params.create();
@@ -72,6 +73,12 @@ public abstract class ExecHTTPBuilder<X, Y> {
         return thisBuilder();
     }
 
+    /** Whether to parse query strings passed to {@link #query(String)}. */
+    public Y parseCheck(boolean parseCheck) {
+        this.parseCheck = parseCheck;
+        return thisBuilder();
+    }
+
     /** Set the query - this also sets the query string to agree with the query argument. */
     public Y query(Query query) {
         Objects.requireNonNull(query);
@@ -86,7 +93,7 @@ public abstract class ExecHTTPBuilder<X, Y> {
      */
     public Y query(String queryStr) {
         Objects.requireNonNull(queryStr);
-        Query query = QueryFactory.create(queryStr);
+        Query query = parseCheck ? QueryFactory.create(queryStr) : null;
         setQuery(query, queryStr);
         return thisBuilder();
     }
@@ -109,7 +116,7 @@ public abstract class ExecHTTPBuilder<X, Y> {
     }
 
     /** Set the query */
-    private void setQuery(Query query, String queryStr) {
+    protected void setQuery(Query query, String queryStr) {
         this.query = query;
         this.queryString = queryStr;
     }
@@ -273,33 +280,22 @@ public abstract class ExecHTTPBuilder<X, Y> {
     public Y context(Context context) {
         if ( context == null )
             return thisBuilder();
-        ensureContext();
         contextAcc.context(context);
-        //this.context.putAll(context);
         return thisBuilder();
     }
 
     public Y set(Symbol symbol, Object value) {
-        ensureContext();
         contextAcc.set(symbol, value);
-        //context.set(symbol, value);
         return thisBuilder();
     }
 
     public Y set(Symbol symbol, boolean value) {
-        ensureContext();
         contextAcc.set(symbol, value);
-        //context.set(symbol, value);
         return thisBuilder();
     }
 
-    private void ensureContext() {
-//        if ( context == null )
-//            context = new Context();
-    }
-
     /**
-     * Set a timeout to the overall overall operation.
+     * Set a timeout of the overall operation.
      * Time-to-connect can be set with a custom {@link HttpClient} - see {@link java.net.http.HttpClient.Builder#connectTimeout(java.time.Duration)}.
      */
     public Y timeout(long timeout, TimeUnit timeoutUnit) {
@@ -324,9 +320,15 @@ public abstract class ExecHTTPBuilder<X, Y> {
         String queryStringActual = queryString;
 
         if ( substitutionMap != null && ! substitutionMap.isEmpty() ) {
-            if ( query == null )
-                throw new QueryException("Substitution only supported if a Query object was provided");
-            queryActual = QueryTransformOps.transform(query, substitutionMap);
+            if ( queryActual == null ) {
+                // Substitution requires a query object. Attempt to parse the given string.
+                try {
+                    queryActual = QueryFactory.create(queryString);
+                } catch (Exception e) {
+                    throw new QueryException("Substitution only supported for Query objects. Failed to parse the given string as a Query object.", e);
+                }
+            }
+            queryActual = QueryTransformOps.replaceVars(queryActual, substitutionMap);
             queryStringActual = queryActual.toString();
         }
         Context cxt = contextAcc.context();

@@ -68,10 +68,6 @@ import org.apache.jena.web.HttpSC;
  */
 public class QueryExecHTTP implements QueryExec {
 
-    /** @deprecated Use {@link #newBuilder} */
-    @Deprecated
-    public static QueryExecHTTPBuilder create() { return newBuilder() ; }
-
     public static QueryExecHTTPBuilder newBuilder() { return QueryExecHTTPBuilder.create(); }
 
     public static QueryExecHTTPBuilder service(String serviceURL) {
@@ -118,7 +114,7 @@ public class QueryExecHTTP implements QueryExec {
     private String httpResponseContentType = null;
     // Releasing HTTP input streams is important. We remember this for SELECT result
     // set streaming, and will close it when the execution is closed
-    private InputStream retainedConnection = null;
+    private volatile InputStream retainedConnection = null;
 
     private HttpClient httpClient = HttpEnv.getDftHttpClient();
     private Map<String, String> httpHeaders;
@@ -149,6 +145,11 @@ public class QueryExecHTTP implements QueryExec {
         this.readTimeout = timeout;
         this.readTimeoutUnit = timeoutUnit;
         this.httpClient = HttpLib.dft(httpClient, HttpEnv.getDftHttpClient());
+    }
+
+    /** Getter for the appProvidedAcceptHeader. Only used for testing. */
+    public String getAppProvidedAcceptHeader() {
+        return appProvidedAcceptHeader;
     }
 
     /** The Content-Type response header received (null before the remote operation is attempted). */
@@ -246,6 +247,8 @@ public class QueryExecHTTP implements QueryExec {
     }
 
     private String removeCharset(String contentType) {
+        if ( contentType == null )
+            return contentType;
         int idx = contentType.indexOf(';');
         if ( idx < 0 )
             return contentType;
@@ -324,7 +327,7 @@ public class QueryExecHTTP implements QueryExec {
         return dataset;
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("removal")
     private Iterator<Triple> execTriples(String acceptHeader) {
         Pair<InputStream, Lang> p = execRdfWorker(acceptHeader, WebContent.contentTypeRDFXML);
         InputStream input = p.getLeft();
@@ -335,7 +338,7 @@ public class QueryExecHTTP implements QueryExec {
         return Iter.onCloseIO(iter, input);
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("removal")
     private Iterator<Quad> execQuads() {
         checkNotClosed();
         Pair<InputStream, Lang> p = execRdfWorker(datasetAcceptHeader, WebContent.contentTypeNQuads);

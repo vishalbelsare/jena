@@ -18,7 +18,6 @@
 package org.apache.jena.ext.xerces.impl.dv.xs;
 
 import org.apache.jena.ext.xerces.impl.dv.InvalidDatatypeValueException;
-import org.apache.jena.ext.xerces.impl.dv.ValidationContext;
 import org.apache.jena.ext.xerces.util.URI;
 
 /**
@@ -45,12 +44,12 @@ public class AnyURIDV extends TypeValidator {
     }
 
     public short getAllowedFacets(){
-        return (XSSimpleTypeDecl.FACET_LENGTH | XSSimpleTypeDecl.FACET_MINLENGTH | XSSimpleTypeDecl.FACET_MAXLENGTH | XSSimpleTypeDecl.FACET_PATTERN | XSSimpleTypeDecl.FACET_ENUMERATION | XSSimpleTypeDecl.FACET_WHITESPACE );
+        return (XSSimpleTypeDecl.FACET_PATTERN | XSSimpleTypeDecl.FACET_WHITESPACE );
     }
 
     // before we return string we have to make sure it is correct URI as per spec.
     // for some types (string and derived), they just return the string itself
-    public Object getActualValue(String content, ValidationContext context) throws InvalidDatatypeValueException {
+    public Object getActualValue(String content) throws InvalidDatatypeValueException {
         // check 3.2.17.c0 must: URI (rfc 2396/2723)
         try {
             if( content.length() != 0 ) {
@@ -104,7 +103,7 @@ public class AnyURIDV extends TypeValidator {
     // and non-ASCII characters (whose value >= 128).
     private static String encode(String anyURI){
         int len = anyURI.length(), ch;
-        StringBuffer buffer = new StringBuffer(len*3);
+        StringBuilder buffer = new StringBuilder(len*3);
 
         // for each character in the anyURI
         int i = 0;

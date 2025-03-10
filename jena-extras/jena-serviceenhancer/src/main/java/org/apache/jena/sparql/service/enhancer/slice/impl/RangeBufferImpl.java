@@ -20,10 +20,10 @@ package org.apache.jena.sparql.service.enhancer.slice.impl;
 
 import java.io.IOException;
 
-import org.apache.jena.ext.com.google.common.collect.Range;
-import org.apache.jena.ext.com.google.common.collect.RangeSet;
-import org.apache.jena.ext.com.google.common.collect.TreeRangeSet;
-import org.apache.jena.ext.com.google.common.math.LongMath;
+import com.google.common.collect.Range;
+import com.google.common.collect.RangeSet;
+import com.google.common.collect.TreeRangeSet;
+
 import org.apache.jena.sparql.service.enhancer.impl.util.RangeUtils;
 import org.apache.jena.sparql.service.enhancer.slice.api.ArrayOps;
 
@@ -136,8 +136,8 @@ public class RangeBufferImpl<A>
 
     @Override
     public void write(long offsetInBuffer, A arrayWithItemsOfTypeT, int arrOffset, int arrLength) throws IOException {
-        long start = LongMath.checkedAdd(offsetInRanges, offsetInBuffer);
-        long end = LongMath.checkedAdd(start, arrLength);
+        long start = Math.addExact(offsetInRanges, offsetInBuffer);
+        long end = Math.addExact(start, arrLength);
 
         if ((offsetInBuffer + arrLength) > backingBuffer.getCapacity()) {
             throw new RuntimeException("Attempt to write beyond buffer capacity");

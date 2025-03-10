@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,8 +23,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.jena.atlas.RuntimeIOException;
 import org.apache.jena.atlas.io.IO;
@@ -50,10 +50,6 @@ public class ServletOps {
      *  Note that we do not set a custom Reason Phrase.
      *  <br/>
      *  HTTPS/2 does not have a "Reason Phrase".
-     *
-     * @param response
-     * @param statusCode
-     * @param message
      */
     public static void responseSendError(HttpServletResponse response, int statusCode, String message) {
         response.setStatus(statusCode);
@@ -72,6 +68,7 @@ public class ServletOps {
      * Use Content-Length so the connection is preserved.
      */
     static void writeMessagePlainText(HttpServletResponse response, String message) {
+        ServletOps.setNoCache(response);
         if ( message == null )
             return;
         if ( ! message.endsWith("\n") )
@@ -79,7 +76,6 @@ public class ServletOps {
         response.setContentLength(message.length());
         response.setContentType(WebContent.contentTypeTextPlain);
         response.setCharacterEncoding(WebContent.charsetUTF8);
-        ServletOps.setNoCache(response);
         try(ServletOutputStream out = response.getOutputStream()){
             out.print(message);
         }
@@ -252,11 +248,11 @@ public class ServletOps {
     }
 
     public static void error(int statusCode) {
-        throw new ActionErrorException(statusCode, null, null);
+        throw actionErrorException(statusCode, null, null);
     }
 
     public static void error(int statusCode, String string) {
-        throw new ActionErrorException(statusCode, string, null);
+        throw actionErrorException(statusCode, string, null);
     }
 
     public static void errorOccurred(String message) {
@@ -268,11 +264,14 @@ public class ServletOps {
     }
 
     public static void errorOccurred(String message, Throwable ex) {
-        if ( message == null )
-            System.err.println();
-        if ( ex instanceof ActionErrorException )
-            throw (ActionErrorException)ex;
-        throw new ActionErrorException(HttpSC.INTERNAL_SERVER_ERROR_500, message, ex);
+        if ( ex instanceof ActionErrorException actionErr )
+            throw actionErr;
+        throw actionErrorException(HttpSC.INTERNAL_SERVER_ERROR_500, message, ex);
+        /* Does not return */
+    }
+
+    private static ActionErrorException actionErrorException(int statusCode, String message, Throwable ex) {
+        return new ActionErrorException(statusCode, message, ex);
     }
 
     public static String formatForLog(String string) {
@@ -288,8 +287,13 @@ public class ServletOps {
     }
 
     public static void setNoCache(HttpServletResponse response) {
+        try {
         response.setHeader(HttpNames.hCacheControl, "must-revalidate,no-cache,no-store");
         response.setHeader(HttpNames.hPragma, "no-cache");
+        } catch (UnsupportedOperationException ex) {
+            // Jetty exception when the response has already been committed
+            // and so the headers can't be set. Ignore.
+        }
     }
 
     /** response to a upload operation of some kind. */

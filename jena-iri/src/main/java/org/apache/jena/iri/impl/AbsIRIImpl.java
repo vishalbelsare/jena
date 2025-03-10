@@ -35,7 +35,7 @@ abstract public class AbsIRIImpl extends  IRI implements
         // 5.2.4 step 1.
         int inputBufferStart = 0;
         int inputBufferEnd = path.length();
-        StringBuffer output = new StringBuffer();
+        StringBuilder output = new StringBuilder();
         // 5.2.4 step 2.
         while (inputBufferStart < inputBufferEnd) {
             String in = path.substring(inputBufferStart);
@@ -88,7 +88,7 @@ abstract public class AbsIRIImpl extends  IRI implements
         return output.toString();
     }
 
-    private static void removeLastSeqment(StringBuffer output) {
+    private static void removeLastSeqment(StringBuilder output) {
         int ix = output.length();
         while (ix > 0) {
             ix--;
@@ -208,7 +208,10 @@ abstract public class AbsIRIImpl extends  IRI implements
 
     @Override
     public boolean isAbsolute() {
-        return has(SCHEME);
+        // Definition from RFC3986 section 4.3
+        return has(SCHEME) && ! has(FRAGMENT);
+        // Definition from RFC2396 section 3.1
+        //return has(SCHEME);
     }
 
     abstract boolean has(int component);
@@ -217,29 +220,6 @@ abstract public class AbsIRIImpl extends  IRI implements
     public boolean isRelative() {
         return !has(SCHEME);
     }
-
-    /*
-     * public boolean isRDFURIReference() { return !hasException(RDF); }
-     *
-     * public boolean isIRI() { return !hasException(IRI); }
-     *
-     * public boolean isURIinASCII() { return !hasException(URI); }
-     */
-    // public boolean isVeryBad() {
-    // return false;
-    // }
-    // public boolean isXSanyURI() {
-    // return !hasException(XMLSchema);
-    // }
-    /*
-    public boolean hasException(int conformance) {
-        return hasExceptionMask(getFactory().recsToMask(conformance));
-    }
-
-    public Iterator exceptions(int conformance) {
-        return exceptionsMask(getFactory().recsToMask(conformance));
-    }
-    */
 
     @Override
     public boolean hasViolation(boolean includeWarnings) {
@@ -283,7 +263,7 @@ abstract public class AbsIRIImpl extends  IRI implements
     }
 
     private String createASCIIString() throws MalformedIDNException {
-        StringBuffer asciiString = new StringBuffer();
+        StringBuilder asciiString = new StringBuilder();
 
         if (has(SCHEME)) {
             toAscii(asciiString, getScheme(), errors(SCHEME));
@@ -315,7 +295,7 @@ abstract public class AbsIRIImpl extends  IRI implements
         return asciiString.toString();
     }
 
-    private void regNameToAscii(StringBuffer asciiString, String host) throws MalformedIDNException  {
+    private void regNameToAscii(StringBuilder asciiString, String host) throws MalformedIDNException  {
         if ((errors(HOST) & ToAsciiMask) == 0) {
             asciiString.append(host);
             return;
@@ -345,7 +325,7 @@ abstract public class AbsIRIImpl extends  IRI implements
         */
     }
 
-    private void toAscii(StringBuffer asciiString, String field, long errs) {
+    private void toAscii(StringBuilder asciiString, String field, long errs) {
         if ((errs & ToAsciiMask) == 0) {
             asciiString.append(field);
             return;
@@ -758,7 +738,7 @@ abstract public class AbsIRIImpl extends  IRI implements
 
     @Override
     public String getASCIIHost() throws MalformedURLException {
-        StringBuffer asciiString = new StringBuffer();
+        StringBuilder asciiString = new StringBuilder();
 
         String host = getRawHost();
         if (host==null)

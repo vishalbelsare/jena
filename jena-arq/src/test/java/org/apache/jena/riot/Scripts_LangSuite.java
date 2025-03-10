@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -26,7 +26,7 @@ import org.junit.runner.RunWith ;
 /** The test suites - these are driven by a manifest file and use external files for tests */
 
 @RunWith(RunnerRIOT.class)
-@Label("RIOT")
+@Label("RIOT Scripts")
 @Manifests({
     "testing/RIOT/Lang/manifest-all.ttl"
 })

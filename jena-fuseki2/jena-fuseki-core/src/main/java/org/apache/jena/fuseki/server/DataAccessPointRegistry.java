@@ -21,14 +21,13 @@ package org.apache.jena.fuseki.server;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
-import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.jena.atlas.lib.Registry;
 import org.apache.jena.atlas.logging.Log;
 import org.apache.jena.fuseki.Fuseki;
 import org.apache.jena.fuseki.FusekiException;
-import org.apache.jena.fuseki.metrics.MetricsProviderRegistry;
+import org.apache.jena.fuseki.servlets.HttpAction;
 
 /**
  * Registry of (dataset name, {@link DataAccessPoint}).
@@ -36,15 +35,10 @@ import org.apache.jena.fuseki.metrics.MetricsProviderRegistry;
  */
 public class DataAccessPointRegistry extends Registry<String, DataAccessPoint>
 {
-    private final MeterRegistry meterRegistry;
-
-    public DataAccessPointRegistry() {
-        this.meterRegistry = MetricsProviderRegistry.get().getMeterRegistry();
-    }
+    public DataAccessPointRegistry() {}
 
     public DataAccessPointRegistry(DataAccessPointRegistry other) {
         other.forEach((_name, accessPoint)->register(accessPoint));
-        this.meterRegistry = other.meterRegistry;
     }
 
     // Preferred way to register. Other method for legacy.
@@ -60,25 +54,15 @@ public class DataAccessPointRegistry extends Registry<String, DataAccessPoint>
      * generated from the registry contents and not still connected to the registry.
      * Registry changes will not interfere with iteration over the list.
      * {@link DataAccessPoint DataAccessPoints} can not be registered twice under
-     * differerent names (the same dataset can be via different
+     * different names (the same dataset can be via different
      * {@link DataAccessPoint DataAccessPoints} so the list has no duplicates.
      * There is no defined order to the list.
      */
     public List<DataAccessPoint> accessPoints() {
         List<DataAccessPoint> accessPoints = new ArrayList<>(size());
-        // Make a copy for safety.
+        // Copy for safety.
         forEach((_name, accessPoint) -> accessPoints.add(accessPoint));
         return accessPoints;
-    }
-
-    /**
-     *  @deprecated Use {@link #register(DataAccessPoint)}.
-     * This method ignores the accessPointName argument.
-     */
-    @Override
-    @Deprecated
-    public void put(String accessPointName, DataAccessPoint dap) {
-        register(dap);
     }
 
     @Override
@@ -107,7 +91,14 @@ public class DataAccessPointRegistry extends Registry<String, DataAccessPoint>
         });
     }
 
-    // The server DataAccessPointRegistry is held in the ServletContext for the server.
+    /** The server DataAccessPointRegistry is held in the ServletContext.
+     * <p>
+     * Reload may change this object for another one. Therefore, code should obtain the
+     * DataAccessPointRegistry once per operation.
+     * <p>
+     * Each request, has a stable {@link HttpAction#getDataAccessPointRegistry()}.
+     * <p>Getting the {@link DataAccessPointRegistry} is atomic.
+     */
     public static DataAccessPointRegistry get(ServletContext cxt) {
         DataAccessPointRegistry registry = (DataAccessPointRegistry)cxt.getAttribute(Fuseki.attrNameRegistry);
         if ( registry == null )
@@ -115,6 +106,10 @@ public class DataAccessPointRegistry extends Registry<String, DataAccessPoint>
         return registry;
     }
 
+    /**
+     * Set or change the {@link DataAccessPointRegistry}.
+     * This is atomic. (In Jetty, it is backed by a ConcurrentHashMap).
+     */
     public static void set(ServletContext cxt, DataAccessPointRegistry registry) {
         cxt.setAttribute(Fuseki.attrNameRegistry, registry);
     }

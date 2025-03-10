@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
+import jsonServer from 'json-server'
+
 const PORT = process.env.FUSEKI_PORT || 3030
 
 const data = {}
-
-const jsonServer = require('json-server')
 
 const server = jsonServer.create()
 const router = jsonServer.router(data)
@@ -32,16 +32,17 @@ server.use(jsonServer.bodyParser)
 
 const DATASETS = {}
 
-const builtTime = new Date()
+// const builtTime = new Date()
 const startTime = new Date()
 
 // Add custom routes before JSON Server router
 
+server.get('/index.html', (req, res) => res.jsonp(''))
+
 // GET SERVER INFO
 server.get('/\\$/server', (req, res) => {
   res.jsonp({
-    version: '3.14.0',
-    built: builtTime.toISOString(),
+    version: '5.x.y',
     startDateTime: startTime.toISOString(),
     uptime: parseInt(`${(new Date() - startTime) / 1000}`),
     datasets: Object.values(DATASETS)
@@ -244,16 +245,26 @@ server.get('/:datasetName/sparql', sparqlCallback)
 server.post('/:datasetName/sparql', sparqlCallback)
 
 // GRAPH
-server.get('/:datasetName', (req, res) => {
-  res
-    .status(200)
-    .set('Content-Type', 'text/turtle')
-    .send(`@prefix :      <https://example.org/book/> .
+const dataContent = `@prefix :      <https://example.org/book/> .
 @prefix dc:    <https://purl.org/dc/elements/1.1/> .
 @prefix ns:    <https://example.org/ns#> .
 @prefix vcard: <https://www.w3.org/2001/vcard-rdf/3.0#> .
 
-:book4  dc:title  "Harry Potter and the Goblet of Fire" .`)
+:book4  dc:title  "Harry Potter and the Goblet of Fire" .`
+
+// This gets called when you count the graphs
+server.get('/:datasetName/data', (req, res) => {
+  res
+    .status(200)
+    .set('Content-Type', 'text/turtle')
+    .send(dataContent)
+})
+
+// Upload data.
+server.post('/:datasetName/data', (req, res) => {
+  res
+    .status(200)
+    .send()
 })
 
 // PING
@@ -269,9 +280,15 @@ server.get('/\\$/ping', (req, res) => {
 // RESET TEST DATA
 server.get('/tests/reset', (req, res) => {
   // Just delete the datasets to clean up for other tests to have a
-  // brand new environment.
-  for (const dataset in DATASETS) {
-    delete DATASETS[dataset]
+  // brand-new environment.
+  if (DATASETS) {
+    try {
+      for (const dataset in DATASETS) {
+        delete DATASETS[dataset]
+      }
+    } catch (e) {
+      console.log(e)
+    }
   }
   res.sendStatus(200)
 })

@@ -58,6 +58,16 @@ public class UpdateBuilderTest {
     private Node o = NodeFactory.createURI("http://example.com/object");
 
     @Test
+    public void testConstructorWithPrefixMappingAndWhereClause() {
+        Model model = ModelFactory.createDefaultModel();
+        model.setNsPrefix("ex", "http://example.com/");
+        UpdateBuilder builder = new UpdateBuilder(model);
+        builder.addInsert(s, "ex:predicate", "?o");
+        builder.addWhere( s, "ex:predicat2", "?o" );
+        builder.build();
+    }
+    
+    @Test
     public void testInsert_SPO() {
         UpdateBuilder builder = new UpdateBuilder();
         builder.addInsert(s, p, o);
@@ -518,7 +528,7 @@ public class UpdateBuilderTest {
     public void example1() {
         Node n = NodeFactory.createURI("http://example/book1");
         Node priceN = NodeFactory.createURI("http://example.org/ns#price");
-        Node priceV = NodeFactory.createLiteral("42");
+        Node priceV = NodeFactory.createLiteralString("42");
         UpdateBuilder builder = new UpdateBuilder().addPrefix("dc", DC_11.NS).addInsert(n, DC_11.title, "A new book")
                 .addInsert(n, DC_11.creator, "A.N.Other");
 

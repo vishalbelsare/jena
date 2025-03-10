@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,8 +21,6 @@ package org.apache.jena.sparql.engine.iterator;
 import static org.junit.Assert.assertEquals;
 
 import java.util.*;
-import java.util.stream.Collectors ;
-
 import org.apache.jena.atlas.iterator.Iter ;
 import org.apache.jena.graph.NodeFactory ;
 import org.apache.jena.sparql.core.Var ;
@@ -43,8 +41,8 @@ public abstract class AbstractTestDistinctReduced {
 
     private static List<Binding> build(List<String> items) {
         return items.stream().sequential()
-                .map((s)-> BindingFactory.binding(var_a, NodeFactory.createLiteral(s)))
-                .collect(Collectors.toList());
+                .map((s)-> BindingFactory.binding(var_a, NodeFactory.createLiteralString(s)))
+                .toList();
     }
 
     protected abstract QueryIterator createQueryIter(List<Binding> data) ;

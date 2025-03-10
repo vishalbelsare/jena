@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -46,21 +46,10 @@ public class JenaSystem {
 
     private static Subsystem<JenaSubsystemLifecycle> singleton = null;
 
-    // Don't rely on class initialization.
-    private static void setup() {
-        // Called inside synchronized
-        if ( singleton == null ) {
-            singleton = new Subsystem<>(JenaSubsystemLifecycle.class);
-            SubsystemRegistry<JenaSubsystemLifecycle> reg =
-                    new SubsystemRegistryServiceLoader<>(JenaSubsystemLifecycle.class);
-            singleton.setSubsystemRegistry(reg);
-            reg.add(new JenaInitLevel0());
-        }
-    }
-
     public JenaSystem() { }
 
-    /** Development support - flag to enable output during
+    /**
+     * Development support - flag to enable output during
      * initialization. Output to {@code System.err}, not a logger
      * to avoid the risk of recursive initialization.
      */
@@ -75,22 +64,58 @@ public class JenaSystem {
         System.err.println() ;
     }
 
+    /**
+     * Initialize Jena. This call can be made several times. Only the first causes
+     * the one-time initialization.
+     */
     public static void init() {
+        init(false);
+    }
+
+    /**
+     * Initialize Jena. This call can be made several times. Only the first causes
+     * the one-time initialization.
+     * <p>
+     * Optionally, output initialization steps (prints to stderr).
+     */
+    public static void init(boolean withTracing) {
         if ( initialized )
             return ;
-        synchronized(JenaSystem.class) {
-            if ( initialized )
-                return ;
-            initialized = true;
+        if ( withTracing )
+            DEBUG_INIT = true;
+
+        // Access the initialized flag to trigger class loading
+        var unused = LazyInitializer.IS_INITIALIZED;
+    }
+
+    public static void shutdown() {
+        singleton.shutdown();
+    }
+
+    private static class LazyInitializer {
+        static final boolean IS_INITIALIZED = jenaSystemInitialization();
+
+        private static boolean jenaSystemInitialization() {
+            JenaSystem.initialized = true; // Set early to avoid blocking on static initialization.
             setup();
             if ( DEBUG_INIT )
                 singleton.debug(DEBUG_INIT);
             singleton.initialize();
             singleton.debug(false);
+            return true;
         }
     }
 
-    public static void shutdown() { singleton.shutdown(); }
+    private static void setup() {
+        // Called inside synchronized
+        if ( singleton == null ) {
+            singleton = new Subsystem<>(JenaSubsystemLifecycle.class);
+            SubsystemRegistry<JenaSubsystemLifecycle> reg =
+                    new SubsystemRegistryServiceLoader<>(JenaSubsystemLifecycle.class);
+            singleton.setSubsystemRegistry(reg);
+            reg.add(new JenaInitLevel0());
+        }
+    }
 
     /** The level 0 subsystem - inserted without using the Registry load function.
      *  There should be only one such level 0 handler.

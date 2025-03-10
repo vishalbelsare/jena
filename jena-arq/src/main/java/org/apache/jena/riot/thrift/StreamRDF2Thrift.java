@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -33,7 +33,6 @@ import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TProtocol;
 
 /** Encode StreamRDF in Thrift.
- *  Usually used via {@link BinRDF} functions.
  *
  * @see Thrift2StreamRDF (for each RDF_StreamRow) for the reverse process.
  */

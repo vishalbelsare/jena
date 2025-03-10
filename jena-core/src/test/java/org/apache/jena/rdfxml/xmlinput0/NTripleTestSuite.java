@@ -242,6 +242,7 @@ class NTripleTestSuite extends WGTestSuite {
 		return loadRDFx(in, eh, base, true, 0);
 	}
 
+    @SuppressWarnings("removal")
     static Model loadRDFx(
 		InFactoryX in,
 		RDFErrorHandler eh,
@@ -273,7 +274,7 @@ class NTripleTestSuite extends WGTestSuite {
 			System.setIn(in.open());
 			System.setOut(out);
 			try {
-				NTriple.mainEh(new String[] { "-b", base, "-s" }, th, th);
+				NTripleARP0.mainEh(new String[] { "-b", base, "-s" }, th, th);
 			} catch (SimulatedException e) {
 				if (wantModel)
 					throw e;

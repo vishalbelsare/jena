@@ -34,13 +34,13 @@ defaults to the version of the overall Jena release it was part of. It is best
 to use the release of this set of tools from the same release of the desired
 server.
 
-    docker-compose build --build-arg JENA_VERSION=4.7.0
+    docker-compose build --build-arg JENA_VERSION=5.3.0
 
 Note the build command must provide the version number.
 
 ## Test Run
 
-`docker-compose run` cam be used to test the build from the previous section.
+`docker-compose run` can be used to test the build from the previous section.
 
 Examples:
 

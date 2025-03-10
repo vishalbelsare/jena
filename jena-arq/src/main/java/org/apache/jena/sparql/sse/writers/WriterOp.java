@@ -49,9 +49,9 @@ import org.apache.jena.sparql.util.FmtUtils;
 
 public class WriterOp
 {
-    private static final int NL     = WriterLib.NL;
-    private static final int NoNL   = WriterLib.NoNL;    // No newline, with space
-    private static final int NoSP   = WriterLib.NoSP;
+    private static final int NL     = SSEWriteLib.NL;
+    private static final int NoNL   = SSEWriteLib.NoNL;    // No newline, with space
+    private static final int NoSP   = SSEWriteLib.NoSP;
 
     public static void output(Op op)
     { output(System.out, op); }
@@ -110,11 +110,11 @@ public class WriterOp
         op.visit(v);
     }
 
-    public static class OpWriterWorker implements OpVisitor {
+    private static class OpWriterWorker implements OpVisitor {
         private IndentedWriter       out;
         private SerializationContext sContext;
 
-        public OpWriterWorker(IndentedWriter out, SerializationContext sCxt) {
+        private OpWriterWorker(IndentedWriter out, SerializationContext sCxt) {
             this.sContext = sCxt;
             this.out = out;
         }
@@ -502,12 +502,12 @@ public class WriterOp
             if ( sc.getDirection() != Query.ORDER_DEFAULT ) {
                 if ( sc.getDirection() == Query.ORDER_ASCENDING ) {
                     tag = Tags.tagAsc;
-                    WriterLib.start(out, tag, NoNL);
+                    SSEWriteLib.start(out, tag, NoNL);
                 }
 
                 if ( sc.getDirection() == Query.ORDER_DESCENDING ) {
                     tag = Tags.tagDesc;
-                    WriterLib.start(out, tag, NoNL);
+                    SSEWriteLib.start(out, tag, NoNL);
                 }
 
             }
@@ -515,7 +515,7 @@ public class WriterOp
             WriterExpr.output(out, sc.getExpression(), sContext);
 
             if ( tag != null )
-                WriterLib.finish(out, tag);
+                SSEWriteLib.finish(out, tag);
         }
 
         @Override
@@ -556,6 +556,25 @@ public class WriterOp
         }
 
         @Override
+        public void visit(OpUnfold opUnfold) {
+            start(opUnfold, NoNL);
+
+            start();
+            WriterExpr.output(out, opUnfold.getExpr(), sContext);
+            out.print(" ");
+            out.print( opUnfold.getVar1().toString() );
+            if ( opUnfold.getVar2() != null ) {
+                out.print(" ");
+                out.print( opUnfold.getVar2().toString() );
+            }
+            finish();
+
+            out.println();
+            printOp(opUnfold.getSubOp());
+            finish(opUnfold);
+        }
+
+        @Override
         public void visit(OpSlice opSlice) {
             start(opSlice, NoNL);
             writeIntOrDefault(opSlice.getStart());
@@ -574,25 +593,25 @@ public class WriterOp
         }
 
         private void start(Op op, int newline) {
-            WriterLib.start(out, op.getName(), newline);
+            SSEWriteLib.start(out, op.getName(), newline);
         }
 
         private void finish(Op op) {
-            WriterLib.finish(out, op.getName());
+            SSEWriteLib.finish(out, op.getName());
         }
 
         private void start() {
-            WriterLib.start(out);
+            SSEWriteLib.start(out);
         }
 
         private void finish() {
-            WriterLib.finish(out);
+            SSEWriteLib.finish(out);
         }
 
         private void printOp(Op op) {
             if ( op == null ) {
-                WriterLib.start(out, Tags.tagNull, NoSP);
-                WriterLib.finish(out, Tags.tagNull);
+                SSEWriteLib.start(out, Tags.tagNull, NoSP);
+                SSEWriteLib.finish(out, Tags.tagNull);
             } else
                 op.visit(this);
         }

@@ -24,8 +24,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.atlas.iterator.Iter;
 import org.apache.jena.atlas.lib.tuple.Tuple;
 import org.apache.jena.dboe.base.file.Location;
-import org.apache.jena.dboe.storage.StoragePrefixes;
 import org.apache.jena.dboe.storage.system.DatasetGraphStorage;
+import org.apache.jena.dboe.trans.bplustree.BPlusTree;
 import org.apache.jena.dboe.transaction.txn.TransactionalSystem;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.Node;
@@ -35,11 +35,13 @@ import org.apache.jena.tdb2.TDBException;
 import org.apache.jena.tdb2.lib.NodeLib;
 import org.apache.jena.tdb2.params.StoreParams;
 import org.apache.jena.tdb2.store.nodetupletable.NodeTupleTable;
+import org.apache.jena.tdb2.store.tupletable.TupleIndexRecord;
 
 final
 public class DatasetGraphTDB extends DatasetGraphStorage
 {
     private final StorageTDB storageTDB;
+    private final StoragePrefixesTDB storagePrefixes;
     private final Location location;
     private final TransactionalSystem txnSystem;
     private final StoreParams storeParams;
@@ -47,8 +49,9 @@ public class DatasetGraphTDB extends DatasetGraphStorage
     private boolean isClosed = false;
 
     public DatasetGraphTDB(Location location, StoreParams params, ReorderTransformation reorderTransformation,
-                           StorageTDB storage, StoragePrefixes prefixes, TransactionalSystem txnSystem) {
+                           StorageTDB storage, StoragePrefixesTDB prefixes, TransactionalSystem txnSystem) {
         super(storage, prefixes, txnSystem);
+        this.storagePrefixes = prefixes;
         this.storageTDB = storage;
         this.location = location;
         this.storeParams = params;
@@ -94,13 +97,17 @@ public class DatasetGraphTDB extends DatasetGraphStorage
 
     @Override
     public void close() {
+        if ( isClosed )
+            return;
         isClosed = true;
         super.close();
+        storageTDB.close();
+        storagePrefixes.close();
     }
 
     public void shutdown() {
-        close();
         txnSystem.getTxnMgr().shutdown();
+        close();
     }
 
     @Override
@@ -137,9 +144,18 @@ public class DatasetGraphTDB extends DatasetGraphStorage
     public Iterator<Node> listGraphNodes() {
         checkNotClosed();
         NodeTupleTable quads = getQuadTable().getNodeTupleTable();
+
+        TupleIndexRecord graphIndex = quads.getTupleTable().selectIndex("G", TupleIndexRecord.class);
+        if (graphIndex != null && graphIndex.getRangeIndex() instanceof BPlusTree bpt ) {
+            Iterator<NodeId> distinctGraphNodeIds
+                    = Iter.iter(bpt.distinctByKeyPrefix(NodeId.SIZE)).map(r -> NodeIdFactory.get(r.getKey(), 0));
+            return NodeLib.nodes(quads.getNodeTable(), distinctGraphNodeIds);
+        }
+
         Iterator<Tuple<NodeId>> x = quads.findAll();
         // If we are using a Graph based index i.e. Graph is the first part of the record then we can use a more
         // efficient distinct implementation that only needs to remember the most recently seen graph name
+        // findAll() always uses the first index for the tuple table hence the assumption in the following test
         boolean usingGraphBasedIndex = StringUtils.startsWith(quads.getTupleTable().getIndex(0).getName(), "G");
         Iterator<NodeId> graphNodeIds = Iter.iter(x).map(t -> t.get(0));
         Iterator<NodeId> distinctGraphNodeIds

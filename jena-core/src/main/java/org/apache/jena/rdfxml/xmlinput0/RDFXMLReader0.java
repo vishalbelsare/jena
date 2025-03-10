@@ -26,13 +26,14 @@ import java.util.Locale ;
 
 import org.apache.jena.datatypes.RDFDatatype ;
 import org.apache.jena.datatypes.TypeMapper ;
+import org.apache.jena.datatypes.xsd.impl.XMLLiteralType;
 import org.apache.jena.graph.* ;
 import org.apache.jena.iri.IRIFactory;
 import org.apache.jena.rdf.model.Model ;
 import org.apache.jena.rdf.model.RDFErrorHandler ;
 import org.apache.jena.rdf.model.RDFReaderI ;
 import org.apache.jena.rdf.model.impl.RDFDefaultErrorHandler ;
-import org.apache.jena.rdfxml.xmlinput0.impl.RDFXMLParser;
+import org.apache.jena.rdfxml.xmlinput0.impl.RDFXMLParser0;
 import org.apache.jena.shared.DoesNotExistException ;
 import org.apache.jena.shared.JenaException ;
 import org.apache.jena.shared.UnknownPropertyException ;
@@ -63,10 +64,10 @@ public class RDFXMLReader0 implements RDFReaderI, ARPErrorNumbers {
      * Creates new JenaReader
      */
     public RDFXMLReader0() {
-        arpf = RDFXMLParser.create();
+        arpf = RDFXMLParser0.create();
     }
 
-    final private RDFXMLParser arpf;
+    final private RDFXMLParser0 arpf;
 
     private Model model;
 
@@ -123,14 +124,14 @@ public class RDFXMLReader0 implements RDFReaderI, ARPErrorNumbers {
     private static Node convert(ALiteral lit) {
         String dtURI = lit.getDatatypeURI();
         if (dtURI == null)
-            return NodeFactory.createLiteral(lit.toString(), lit.getLang());
+            return NodeFactory.createLiteralLang(lit.toString(), lit.getLang());
 
         if (lit.isWellFormedXML()) {
-            return NodeFactory.createLiteral(lit.toString(), null, true);
+            return NodeFactory.createLiteral(lit.toString(), null, XMLLiteralType.rdfXMLLiteral);
         }
 
         RDFDatatype dt = TypeMapper.getInstance().getSafeTypeByName(dtURI);
-        return NodeFactory.createLiteral(lit.toString(), dt);
+        return NodeFactory.createLiteralDT(lit.toString(), dt);
 
     }
 

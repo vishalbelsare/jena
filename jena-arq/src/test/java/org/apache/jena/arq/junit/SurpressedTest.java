@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,13 +20,19 @@ package org.apache.jena.arq.junit;
 
 import org.apache.jena.arq.junit.manifest.ManifestEntry;
 
-public class SurpressedTest implements Runnable
+public class SurpressedTest extends SkipTest
 {
-    public static boolean verbose = true;
+    public final boolean verbose;
     private ManifestEntry testEntry;
 
     public SurpressedTest(ManifestEntry entry) {
-        this.testEntry = entry;
+        super(entry);
+        this.verbose = false;
+    }
+
+    public SurpressedTest(ManifestEntry entry, boolean verbose) {
+        super(entry);
+        this.verbose = verbose;
     }
 
     @Override

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -31,7 +31,7 @@ import org.junit.runner.RunWith ;
 /** Execute turtle test with alt parser. */
 
 @RunWith(RunnerRIOT.class)
-@Label("RIOT-TurtleJCC")
+@Label("RIOT-TurtleJCC Scripts")
 @Manifests({
     "testing/RIOT/Lang/TurtleStd/manifest.ttl",
     "testing/RIOT/Lang/Turtle2/manifest.ttl",

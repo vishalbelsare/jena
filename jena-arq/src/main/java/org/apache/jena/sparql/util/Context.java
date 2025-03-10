@@ -20,9 +20,11 @@ package org.apache.jena.sparql.util;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
 import org.apache.jena.atlas.lib.Lib;
+import org.apache.jena.atlas.logging.Log;
 import org.apache.jena.query.ARQ;
 import org.apache.jena.sparql.ARQConstants;
 import org.apache.jena.sparql.ARQException;
@@ -58,7 +60,7 @@ public class Context {
      * Create a context and initialize it with a copy of the named values of
      * another one. Shallow copy: the values themselves are not copied
      */
-    public Context(Context cxt) {
+    private Context(Context cxt) {
         putAll(cxt);
     }
 
@@ -78,6 +80,12 @@ public class Context {
             return;
         }
         context.put(property, value);
+    }
+
+    protected void mapPutAll(Context other) {
+        if ( readonly )
+            throw new ARQException("Context is readonly");
+        other.mapForEach(context::put);
     }
 
     protected void mapRemove(Symbol property) {
@@ -127,7 +135,7 @@ public class Context {
         return x;
     }
 
-    /** Store a named value - overwrites any previous set value */
+    /** Store a named value - overwrites any previous set value. */
     public void put(Symbol property, Object value) {
         mapPut(property, value);
     }
@@ -167,11 +175,13 @@ public class Context {
         return set(property, Boolean.FALSE);
     }
 
+    public Context setAll(Context other) {
+        putAll(other);
+        return this;
+    }
+
     public void putAll(Context other) {
-        if ( readonly )
-            throw new ARQException("Context is readonly");
-        if ( other != null )
-            other.mapForEach(this::put);
+        mapPutAll(other);
     }
 
     /** Remove any value associated with a property */
@@ -179,9 +189,10 @@ public class Context {
         mapRemove(property);
     }
 
-    /** Remove any value associated with a property - alternative method name */
-    public void unset(Symbol property) {
+    /** Remove any value associated with a property. Returns "this". */
+    public Context unset(Symbol property) {
         remove(property);
+        return this;
     }
 
     // ---- Helpers
@@ -301,6 +312,32 @@ public class Context {
         return x.equals(Boolean.FALSE);
     }
 
+    /**
+     * Is the value true or false, either as a Boolean or a string.
+     * If undefined, return null.
+     * Exception if not a boolean or a string.
+     *
+     */
+    public Boolean getTrueOrFalse(Symbol property) {
+        Object x = get(property);
+        if ( x == null )
+            return null;
+        if ( x instanceof String ) {
+            String s = (String)x;
+            if ( s.equalsIgnoreCase("false") )
+                return false;
+            if ( s.equalsIgnoreCase("true") )
+                return true;
+            throw new ARQException("Bad string for boolean: "+s);
+        }
+        // Possible class cast exception.
+        try {
+            return (Boolean)x;
+        } catch (Throwable th) {
+            throw new ARQException("Bad setting for boolean: "+x);
+        }
+    }
+
     // -- Test for value
 
     /** Test whether a named value is a specific value (.equals) */
@@ -381,6 +418,26 @@ public class Context {
 
     public static void setCurrentDateTime(Context context) {
         context.set(ARQConstants.sysCurrentTime, NodeFactoryExtra.nowAsDateTime());
+    }
+
+    public static AtomicBoolean getCancelSignal(Context context) {
+        if ( context == null )
+            return null;
+        try {
+            return context.get(ARQConstants.symCancelQuery);
+        } catch (ClassCastException ex) {
+            Log.error(Context.class, "Class cast exception: Expected AtomicBoolean for cancel control: "+ex.getMessage());
+            return null;
+        }
+    }
+
+    public static AtomicBoolean getOrSetCancelSignal(Context context) {
+        AtomicBoolean cancelSignal = getCancelSignal(context);
+        if (cancelSignal == null) {
+            cancelSignal = new AtomicBoolean(false);
+            context.set(ARQConstants.symCancelQuery, cancelSignal);
+        }
+        return cancelSignal;
     }
 
     /** Merge an outer (defaults to the system global context)
